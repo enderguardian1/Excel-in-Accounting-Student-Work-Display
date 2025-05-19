@@ -1,0 +1,53 @@
+/* Main Styling for Accounting Portal */ body { background-color: #D4D4D4; font-family: 'Arial Black', 'Segoe UI Black', sans-serif; font-weight: bold; margin: 0; padding: 20px; }
+
+h1 { text-align: center; margin-top: 1.5rem; font-size: 2.5rem; color: #222; }
+
+h2 { font-size: 1.8rem; margin-bottom: 1rem; color: #333; }
+
+.container { max-width: 1100px; margin: 2rem auto; text-align: center; }
+
+/* Portal Page (Main Page) */ .groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin: 2rem auto; max-width: 800px; }
+
+.groups a { display: block; padding: 2rem 1rem; background-color: #444; color: white; text-decoration: none; text-align: center; font-size: 1.5rem; border-radius: 10px; transition: all 0.2s ease; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+
+.groups a:hover { background-color: #222; transform: translateY(-5px); box-shadow: 0 8px 16px rgba(0,0,0,0.3); }
+
+/* Group Pages */ .back-link { display: inline-block; margin: 1rem 0 2rem; color: #222; text-decoration: none; font-size: 1.1rem; }
+
+.back-link:hover { text-decoration: underline; }
+
+.sheet-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; }
+
+@media (max-width: 768px) { .sheet-buttons { grid-template-columns: repeat(2, 1fr); } }
+
+@media (max-width: 480px) { .sheet-buttons { grid-template-columns: 1fr; } }
+
+.sheet-buttons button { padding: 1.2rem 1rem; font-size: 1.2rem; background-color: #444; color: white; border: none; border-radius: 8px; cursor: pointer; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+
+.sheet-buttons button:hover { background-color: #222; transform: translateY(-3px); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+
+.sheet-buttons button.active { background-color: #222; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); transform: translateY(1px); }
+
+.sheet-panel { display: none; background-color: white; border-radius: 12px; padding: 2rem; margin-top: 1rem; box-shadow: 0 0 15px rgba(0, 0, 0, 0.15); text-align: left; }
+
+.sheet-panel.active { display: block; }
+
+#sheet-table-container { margin: 1.5rem 0; min-height: 400px; overflow: auto; }
+
+/* Action buttons */ .action-buttons { margin-top: 1.5rem; display: flex; align-items: center; justify-content: center; gap: 1rem; }
+
+#save-changes { padding: 0.8rem 1.5rem; font-size: 1rem; background-color: #2e7d32; color: white; border: none; border-radius: 6px; cursor: pointer; transition: background-color 0.2s; }
+
+#save-changes:hover { background-color: #1b5e20; }
+
+#save-status { font-size: 1rem; padding: 0.5rem; }
+
+#save-status.success { color: #2e7d32; }
+
+#save-status.error { color: #c62828; }
+
+/* Make the Handsontable more visually appealing */ .handsontable { font-size: 14px; }
+
+.handsontable th { background-color: #e0e0e0; font-weight: bold; font-family: Arial, sans-serif; }
+
+.error { color: #c62828; padding: 1rem; background-color: #ffebee; border-radius: 4px; }
