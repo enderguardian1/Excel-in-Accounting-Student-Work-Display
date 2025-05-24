@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Excel Data Viewer</title>
+    <base href="./">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.css">
+    <link rel="stylesheet" href="../style.css"> <style>
+        /* Minimal styling with button styles */
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #D4D4D4;
+        }
+        #sheet-container {
+            margin-top: 20px;
+        }
+        .sheet-table-container {
+            margin-bottom: 20px;
+        }
+        .sheet-table-container h2 {
+            margin-top: 0;
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        #button-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        #button-container button {
+            padding: 12px 18px;
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        #button-container button:hover {
+            background-color: #222;
+        }
+        #button-container button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        #view-all-button {
+            padding: 12px 18px;
+            background-color: #e0e0e0;
+            color: #333;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        #view-all-button:hover {
+            background-color: #ccc;
+        }
+        #back-to-portal {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        #back-to-portal:hover {
+            background-color: #0056b3;
+        }
+
+        /* Styling for the save status message */
+        #save-status {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        #save-status.success {
+            color: green;
+        }
+        #save-status.error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div id="button-container">
+        <button data-sheet="CHARTS OF ACCOUNTS">CHARTS OF ACCOUNTS</button>
+        <button data-sheet="GENERAL JOURNAL">GENERAL JOURNAL</button>
+        <button data-sheet="LEDGER">LEDGER</button>
+        <button data-sheet="TRAIL BALANCE">TRAIL BALANCE</button>
+        <button data-sheet="ACCOUNTS">ACCOUNTS</button>
+        <button id="view-all-button">View All Sheets</button>
+    </div>
+    <div id="sheet-container"></div>
+    <div id="save-status"></div> <button id="back-to-portal">Back to Portal</button>
+
+    <script src="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        // --- NEW: Define your Render Backend URL here ---
+        const BACKEND_URL = 'https://accounting-project-backend.onrender.com'; // <--- REPLACE THIS WITH YOUR ACTUAL RENDER URL!
+
+        const sheetContainer = document.getElementById('sheet-container');
+        const viewAllButton = document.getElementById('view-all-button');
+        const buttonContainer = document.getElementById('button-container');
+        const backToPortalButton = document.getElementById('back-to-portal');
+        const saveStatusDiv = document.getElementById('save-status'); // NEW: Reference to save status div
+
+        let workbookData = null;
+        let activeSheetButton = null;
+
+        // NEW: Map to store Handsontable instances by sheet name for later access
+        const hotInstances = {};
+
+        // Helper function to convert column index (0-based) to Excel letter (A, B, C...)
+        function getExcelColumnLetter(colIndex) {
+            let letter = '';
+            let tempColIndex = colIndex;
+            while (tempColIndex >= 0) {
+                letter = String.fromCharCode(65 + (tempColIndex % 26)) + letter;
+                tempColIndex = Math.floor(tempColIndex / 26) - 1;
+            }
+            return letter;
+        }
+
+        viewAllButton.addEventListener('click', handleViewAll);
+        backToPortalButton.addEventListener('click', function() {
+            window.location.href = '../Portal.html';
+        });
+
+        const sheetButtons = buttonContainer.querySelectorAll('button[data-sheet]');
+
+
+        function handleViewAll() {
+            if (!workbookData) return;
+            sheetContainer.innerHTML = '';
+            displayAllSheets(workbookData);
+            if (activeSheetButton) {
+                activeSheetButton.classList.remove('active');
+            }
+            // NEW: Clear save status when viewing all
+            saveStatusDiv.textContent = '';
+            saveStatusDiv.className = '';
+        }
+
+        function displaySheet(workbook, sheetName) {
+            sheetContainer.innerHTML = '';
+            // NEW: Clear save status when changing sheets
+            saveStatusDiv.textContent = '';
+            saveStatusDiv.className = '';
+
+            try {
+                const worksheet = workbook.Sheets[sheetName];
+                if (!worksheet) {
+                    sheetContainer.innerHTML = `<p style="color: red;">Sheet "${sheetName}" not found in the Excel file.</p>`;
+                    console.error(`Sheet "${sheetName}" not found. Available sheets: ${workbook.SheetNames}`);
+                    return;
+                }
+                const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+                const container = document.createElement('div');
+                container.className = 'sheet-table-container';
+                container.innerHTML = `<h2>${sheetName}</h2>`;
+                const tableDiv = document.createElement('div');
+                tableDiv.className = 'handsontable-container';
+                container.appendChild(tableDiv);
+                sheetContainer.appendChild(container);
+
+                const hot = new Handsontable(tableDiv, {
+                    data: data,
+                    colHeaders: true,
+                    rowHeaders: true,
+                    readOnly: false, // <-- CHANGED: Allow editing
+                    licenseKey: 'non-commercial-and-evaluation',
+                    // --- NEW: Handsontable hook to detect changes and save them ---
+                    afterChange: async function(changes, source) {
+                        if (source === 'loadData') { // Don't save on initial data load
+                            return;
+                        }
+                        if (changes) {
+                            // Loop through each change (there might be multiple if user pastes)
+                            for (let i = 0; i < changes.length; i++) {
+                                const [row, colIndex, oldValue, newValue] = changes[i];
+
+                                // row is 0-indexed, so add 1 to match Excel row numbers
+                                const excelRow = row + 1;
+                                // Convert 0-indexed colIndex to Excel column letter (A, B, C...)
+                                const excelCol = getExcelColumnLetter(colIndex);
+
+                                console.log(`Attempting to save: Sheet=${sheetName}, Row=${excelRow}, Col=${excelCol}, NewValue=${newValue}`);
+
+                                try {
+                                    saveStatusDiv.textContent = 'Saving...';
+                                    saveStatusDiv.className = ''; // Clear previous status
+
+                                    const response = await fetch(`${BACKEND_URL}/api/updateExcel`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Accept': 'application/json'
+                                        },
+                                        body: JSON.stringify({
+                                            sheetName: sheetName,
+                                            row: excelRow,
+                                            col: excelCol,
+                                            newValue: newValue
+                                        })
+                                    });
+
+                                    if (response.ok) {
+                                        const data = await response.json();
+                                        console.log('Backend response:', data.message);
+                                        saveStatusDiv.textContent = 'Saved!';
+                                        saveStatusDiv.className = 'success';
+                                    } else {
+                                        const errorData = await response.json();
+                                        console.error('Failed to send data to backend:', response.status, errorData);
+                                        saveStatusDiv.textContent = `Error: ${errorData.message || 'Unknown error'}`;
+                                        saveStatusDiv.className = 'error';
+                                        // Optional: You might want to revert the cell value here
+                                        // hot.setDataAtCell(row, colIndex, oldValue);
+                                    }
+                                } catch (error) {
+                                    console.error('Network or fetch error:', error);
+                                    saveStatusDiv.textContent = 'Network Error: Could not connect to backend.';
+                                    saveStatusDiv.className = 'error';
+                                }
+                            }
+                        }
+                    }
+                });
+                // Store the Handsontable instance for this sheet
+                hotInstances[sheetName] = hot;
+
+            } catch (error) {
+                console.error("Error displaying sheet:", error);
+                sheetContainer.innerHTML = `<p style="color: red;">Error displaying sheet: ${error.message}</p>`;
+            }
+        }
+
+        function displayAllSheets(workbook) {
+            workbook.SheetNames.forEach((sheetName, sheetIndex) => {
+                try {
+                    const worksheet = workbook.Sheets[sheetName];
+                    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+                    const container = document.createElement('div');
+                    container.className = 'sheet-table-container';
+                    container.innerHTML = `<h2>${sheetName}</h2>`;
+                    const tableDiv = document.createElement('div');
+                    tableDiv.className = 'handsontable-container';
+                    container.appendChild(tableDiv);
+                    sheetContainer.appendChild(container);
+
+                    const hot = new Handsontable(tableDiv, {
+                        data: data,
+                        colHeaders: true,
+                        rowHeaders: true,
+                        readOnly: false, // <-- CHANGED: Allow editing for all sheets in view all
+                        licenseKey: 'non-commercial-and-evaluation',
+                        // --- NEW: Handsontable hook to detect changes and save them ---
+                        afterChange: async function(changes, source) {
+                            if (source === 'loadData') {
+                                return;
+                            }
+                            if (changes) {
+                                for (let i = 0; i < changes.length; i++) {
+                                    const [row, colIndex, oldValue, newValue] = changes[i];
+                                    const excelRow = row + 1;
+                                    const excelCol = getExcelColumnLetter(colIndex);
+
+                                    console.log(`Attempting to save: Sheet=${sheetName}, Row=${excelRow}, Col=${excelCol}, NewValue=${newValue}`);
+
+                                    try {
+                                        // Note: For 'View All', status updates might be messy with multiple tables
+                                        // Consider a global status or per-table status if needed
+                                        const response = await fetch(`${BACKEND_URL}/api/updateExcel`, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'Accept': 'application/json'
+                                            },
+                                            body: JSON.stringify({
+                                                sheetName: sheetName,
+                                                row: excelRow,
+                                                col: excelCol,
+                                                newValue: newValue
+                                            })
+                                        });
+
+                                        if (response.ok) {
+                                            console.log('Backend response:', (await response.json()).message);
+                                            // Status update for view all can be more complex due to multiple tables
+                                        } else {
+                                            console.error('Failed to send data to backend:', response.status, await response.json());
+                                        }
+                                    } catch (error) {
+                                        console.error('Network or fetch error:', error);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    hotInstances[sheetName] = hot; // Store instance
+
+                } catch (error) {
+                    console.error("Error displaying sheet:", error);
+                    sheetContainer.innerHTML += `<p style="color: red;">Error displaying sheet: ${error.message}</p>`;
+                }
+            });
+        }
+
+
+        // Simulate file input change with SAMPLE.xlsx on page load
+        window.onload = function() {
+            // Fetch the actual file.
+            fetch('./SAMPLE.xlsx') // Ensure SAMPLE.xlsx is in the same directory or adjust the path
+                .then(response => response.blob())
+                .then(blob => {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const data = e.target.result;
+                        try {
+                            workbookData = XLSX.read(data, { type: 'array' });
+                        } catch (error) {
+                            console.error("Error reading Excel file:", error);
+                            sheetContainer.innerHTML = `<p style="color: red;">Error reading Excel file: ${error.message}</p>`;
+                            return;
+                        }
+
+                        sheetContainer.innerHTML = '';
+                        viewAllButton.style.display = 'block';
+                        if (workbookData && workbookData.SheetNames.length > 0) {
+                            console.log("Sheet Names in Excel File:", workbookData.SheetNames);
+
+                            const correctSheetNames = workbookData.SheetNames;
+                            const buttonContainerElement = document.getElementById('button-container');
+                            buttonContainerElement.innerHTML = ''; // Clear existing buttons.
+
+                            correctSheetNames.forEach(sheetName => {
+                                const button = document.createElement('button');
+                                button.textContent = sheetName;
+                                button.dataset.sheet = sheetName;
+                                button.addEventListener('click', function() {
+                                    if (workbookData) {
+                                        displaySheet(workbookData, sheetName);
+                                        if (activeSheetButton) {
+                                            activeSheetButton.classList.remove('active');
+                                        }
+                                        this.classList.add('active');
+                                        activeSheetButton = this;
+                                    }
+                                });
+                                buttonContainerElement.appendChild(button);
+                            });
+                            const viewAllButtonElement = document.createElement('button');
+                            viewAllButtonElement.id = 'view-all-button';
+                            viewAllButtonElement.textContent = 'View All Sheets';
+                            viewAllButtonElement.addEventListener('click', handleViewAll);
+                            buttonContainerElement.appendChild(viewAllButtonElement);
+
+
+                            const firstSheetName = workbookData.SheetNames[0];
+                            displaySheet(workbookData, firstSheetName);
+                            const firstButton = document.querySelector(`button[data-sheet="${firstSheetName}"]`);
+                            if (firstButton) {
+                                firstButton.classList.add('active');
+                                activeSheetButton = firstButton;
+                            }
+                        }
+                    };
+                    reader.onerror = function(error) {
+                        console.error("Error reading file:", error);
+                        sheetContainer.innerHTML = `<p style="color: red;">Error reading file: ${error.message}</p>`;
+                    };
+                    reader.readAsArrayBuffer(blob);
+                })
+                .catch(error => {
+                    console.error("Error fetching SAMPLE.xlsx:", error);
+                    sheetContainer.innerHTML = `<p style="color: red;">Error fetching SAMPLE.xlsx: ${error}</p>`;
+                });
+        };
+    </script>
+</body>
+</html>
