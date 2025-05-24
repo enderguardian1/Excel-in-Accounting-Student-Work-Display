@@ -155,7 +155,7 @@
                     // Assuming you have a way to get the current active sheet name
                     // For now, we'll hardcode 'Sheet1' or get it from a global variable if available
                     // You might need to adjust this if your frontend handles multiple sheets
-                    const activeSheetName = 'CHARTS OF ACCOUNTS'; // <-- ADJUST THIS IF YOUR SHEET NAME IS DIFFERENT OR DYNAMIC
+                    const activeSheetName = 'CHARTS OF ACCOUNTS'; // ENSURE NO TRAILING SPACE HERE
 
                     try {
                         const response = await fetch(`${BACKEND_URL}/api/updateExcel`, {
