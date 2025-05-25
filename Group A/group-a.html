@@ -209,7 +209,8 @@
         // from MongoDB onto the grid.
         if (data && data.length > 0) {
             data.forEach(cell => {
-                if (cell.sheetName === hot.getSheetName(0)) { // Assuming 'CHARTS OF ACCOUNTS' is sheet 0
+                // Trim both sheet names before comparison to ignore leading/trailing spaces
+                if (cell.sheetName.trim() === activeSheetName.trim()) { // Use activeSheetName for consistency
                     hot.setDataAtCell(cell.row, cell.col, cell.cellValue, 'loadData');
                 }
             });
