@@ -5,14 +5,16 @@
     <title>Excel Data Viewer</title>
     <base href="./">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.css">
-    <link rel="stylesheet" href="../style.css"> <style>
+    <link rel="stylesheet" href="../style.css">
+    <style>
         /* Minimal styling with button styles */
         body {
             font-family: Arial, sans-serif;
             padding: 20px;
             background-color: #D4D4D4;
         }
-        #sheet-container {
+        /* Changed from #sheet-container to #excel-container for main table */
+        #excel-container { 
             margin-top: 20px;
         }
         .sheet-table-container {
@@ -77,65 +79,186 @@
         }
 
         /* Styling for the save status message */
-        #save-status {
+        #saveStatus { /* Corrected ID from save-status to saveStatus */
             margin-top: 10px;
             font-weight: bold;
         }
-        #save-status.success {
+        #saveStatus.success {
             color: green;
         }
-        #save-status.error {
+        #saveStatus.error {
             color: red;
         }
     </style>
 </head>
-<div id="button-container">
-    <button data-sheet="CHARTS OF ACCOUNTS">CHARTS OF ACCOUNTS</button>
-    <button data-sheet="GENERAL JOURNAL">GENERAL JOURNAL</button>
-    <button data-sheet="LEDGER">LEDGER</button>
-    <button data-sheet="TRAIL BALANCE">TRAIL BALANCE</button>
-    <button data-sheet="ACCOUNTS">ACCOUNTS</button>
-    <button id="view-all-button">View All Sheets</button>
-</div>
+<body>
+    <div id="button-container">
+        <button data-sheet="CHARTS OF ACCOUNTS">CHARTS OF ACCOUNTS</button>
+        <button data-sheet="GENERAL JOURNAL">GENERAL JOURNAL</button>
+        <button data-sheet="LEDGER">LEDGER</button>
+        <button data-sheet="TRAIL BALANCE">TRAIL BALANCE</button>
+        <button data-sheet="ACCOUNTS">ACCOUNTS</button>
+        <button id="view-all-button">View All Sheets</button>
+    </div>
 
-<div id="excel-container"></div>
+    <div id="excel-container"></div> 
 
-<div id="saveStatus" style="margin-top: 10px; font-weight: bold;"></div> 
+    <div id="saveStatus" style="margin-top: 10px; font-weight: bold;"></div> 
 
-<button id="back-to-portal">Back to Portal</button>
+    <button id="back-to-portal">Back to Portal</button>
 
-<script src="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.js"></script>
-<link href="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        // Backend URL - IMPORTANT: This must be your actual Render backend URL
+        const BACKEND_URL = 'https://accounting-project-backend.onrender.com';
 
-<script>
-    // Make sure this URL is correct and points to your deployed Render backend
-    const BACKEND_URL = 'https://accounting-project-backend.onrender.com'; // Your corrected URL
-    const container = document.getElementById('excel-container'); // Or 'sheet-container' if you changed it
-    const saveStatusDiv = document.getElementById('saveStatus');
+        // Get the HTML container for Handsontable
+        const container = document.getElementById('excel-container');
+        // Get the save status message div
+        const saveStatusDiv = document.getElementById('saveStatus');
 
-    let hot; // Declare Handsontable instance globally so we can access it
+        let hot; // Declare Handsontable instance globally
 
-    // *** MOVE THIS LINE HERE ***
-    const activeSheetName = 'CHARTS OF ACCOUNTS'; // Define it once, in a higher scope
+        // Define the active sheet name globally
+        const activeSheetName = 'CHARTS OF ACCOUNTS';
 
-    // Function to initialize Handsontable with data
-    async function initializeHandsontable(data) {
-        // ... (rest of your initializeHandsontable function) ...
-        // The line `if (cell.sheetName.trim() === activeSheetName.trim())` will now work here.
-    }
+        // Function to display status messages
+        function showStatus(message, isError = false) {
+            if (saveStatusDiv) {
+                saveStatusDiv.textContent = message;
+                saveStatusDiv.className = isError ? 'error' : 'success';
+                setTimeout(() => {
+                    saveStatusDiv.textContent = '';
+                    saveStatusDiv.className = '';
+                }, 3000); // Clear message after 3 seconds
+            }
+        }
 
-    // Function to fetch data from backend and then initialize Handsontable
-    async function loadDataAndInitializeHandsontable() {
-        // ... (rest of your loadDataAndInitializeHandsontable function) ...
-    }
+        // Function to send data to the backend
+        async function saveData(changes) {
+            if (!changes || changes.length === 0) {
+                return; // No changes to save
+            }
 
-    // ... (The afterChange function - make sure you REMOVE the `const activeSheetName = 'CHARTS OF ACCOUNTS';` line from inside afterChange if it's there, as it will now use the one defined above) ...
+            // Transform changes into the cell format expected by the backend
+            const transformedChanges = changes.map(([row, col, oldValue, newValue]) => ({
+                sheetName: activeSheetName, // Use the globally defined activeSheetName
+                row,
+                col,
+                cellValue: newValue
+            }));
 
-    // Call the function to load data and initialize Handsontable when the DOM is ready
-    document.addEventListener('DOMContentLoaded', loadDataAndInitializeHandsontable);
+            try {
+                showStatus('Saving data...');
+                const response = await fetch(`${BACKEND_URL}/api/updateExcel`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(transformedChanges)
+                });
 
-</script>
+                if (!response.ok) {
+                    const errorText = await response.text(); // Get error response as text
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                }
+
+                const result = await response.json();
+                console.log('Frontend: Save successful:', result);
+                showStatus('Data saved successfully!', false);
+            } catch (error) {
+                console.error('Frontend: Network error during save:', error);
+                showStatus(`Save failed: ${error.message}`, true);
+            }
+        }
+
+        // Initialize Handsontable with data
+        async function initializeHandsontable(data) {
+            if (!container) {
+                console.error("Handsontable container element not found! Check HTML ID.");
+                return;
+            }
+
+            // Destroy existing instance if it exists
+            if (hot) {
+                hot.destroy();
+            }
+
+            // Create a default empty spreadsheet data structure (e.g., 10x10)
+            const defaultData = Handsontable.helper.createEmptySpreadsheetData(10, 10);
+
+            hot = new Handsontable(container, {
+                data: defaultData, // Start with empty data, then populate from fetched data
+                rowHeaders: true,
+                colHeaders: true,
+                contextMenu: true,
+                manualColumnResize: true,
+                manualRowResize: true,
+                width: '100%',
+                height: 'auto',
+                stretchH: 'all',
+                afterChange: function(changes, source) {
+                    // This callback fires after any change in the table
+                    if (source === 'loadData') {
+                        return; // Don't save changes that came from loading data
+                    }
+                    saveData(changes); // Call saveData function
+                }
+            });
+
+            // Populate the table with fetched data if available
+            if (data && data.length > 0) {
+                data.forEach(cell => {
+                    // Check if cell data belongs to the active sheet
+                    if (cell.sheetName && cell.sheetName.trim() === activeSheetName.trim()) {
+                        hot.setDataAtCell(cell.row, cell.col, cell.cellValue, 'loadData');
+                    }
+                });
+            }
+            hot.render(); // Ensure the table is rendered after data is set
+        }
+
+        // Function to fetch data from backend and then initialize Handsontable
+        async function loadDataAndInitializeHandsontable() {
+            showStatus('Loading data...');
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/getExcelData`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                }
+                const data = await response.json();
+                console.log('Frontend: Data loaded successfully:', data);
+                initializeHandsontable(data); // Initialize Handsontable with the fetched data
+                showStatus('Data loaded successfully!', false);
+            } catch (error) {
+                console.error('Frontend: Network error during data load:', error);
+                showStatus(`Failed to load data: ${error.message}`, true);
+                initializeHandsontable([]); // Initialize an empty table even if loading fails
+            }
+        }
+
+        // Event listener for "Back to Portal" button
+        document.getElementById('back-to-portal').addEventListener('click', () => {
+            window.location.href = '../index.html'; // Adjust path if needed
+        });
+
+        // Event listener for other sheet buttons (assuming they are data-sheet buttons)
+        document.querySelectorAll('#button-container button[data-sheet]').forEach(button => {
+            button.addEventListener('click', function() {
+                const sheet = this.getAttribute('data-sheet');
+                // You would typically handle sheet switching logic here.
+                // For now, if activeSheetName is constant, these buttons don't change the displayed sheet.
+                // You'd need to adjust activeSheetName and reload data if you want to switch sheets dynamically.
+                alert(`Clicked on sheet: ${sheet}. Sheet switching not fully implemented yet.`);
+            });
+        });
+
+        // Call the function to load data and initialize Handsontable when the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', loadDataAndInitializeHandsontable);
+
+    </script>
 </body>
 </html>
