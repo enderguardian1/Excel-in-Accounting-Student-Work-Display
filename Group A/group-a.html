@@ -138,6 +138,9 @@
 
         // Function to send data to the backend
         async function saveData(changes) {
+            // *** ADD THIS LOG ***
+            console.log("saveData received changes:", changes);
+            
             if (!changes || changes.length === 0) {
                 return; // No changes to save
             }
@@ -149,6 +152,9 @@
                 col,
                 cellValue: newValue
             }));
+            
+            // *** ADD THIS LOG ***
+            console.log("Transformed changes for saving:", transformedChanges);
 
             try {
                 showStatus('Saving data...');
@@ -200,6 +206,9 @@
                 height: 'auto',
                 stretchH: 'all',
                 afterChange: function(changes, source) {
+                    // *** ADD THIS LOG ***
+                    console.log("afterChange triggered. Source:", source, "Raw Changes:", changes);
+                    
                     // This callback fires after any change in the table
                     if (source === 'loadData') {
                         return; // Don't save changes that came from loading data
