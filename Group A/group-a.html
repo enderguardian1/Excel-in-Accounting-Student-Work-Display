@@ -89,19 +89,26 @@
         }
     </style>
 </head>
-<body>
-    <h1>Group A - Charts of Accounts</h1>
-    <nav>
-        <a href="index.html">Home</a> |
-        <a href="group-a.html">Group A</a>
-        </nav>
+<div id="button-container">
+    <button data-sheet="CHARTS OF ACCOUNTS">CHARTS OF ACCOUNTS</button>
+    <button data-sheet="GENERAL JOURNAL">GENERAL JOURNAL</button>
+    <button data-sheet="LEDGER">LEDGER</button>
+    <button data-sheet="TRAIL BALANCE">TRAIL BALANCE</button>
+    <button data-sheet="ACCOUNTS">ACCOUNTS</button>
+    <button id="view-all-button">View All Sheets</button>
+</div>
 
-    <div id="saveStatus" style="margin-top: 10px; font-weight: bold;"></div>
-    <div id="excel-container"></div>
+<div id="excel-container"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.css" rel="stylesheet">
-    
+<div id="saveStatus" style="margin-top: 10px; font-weight: bold;"></div> 
+
+<button id="back-to-portal">Back to Portal</button>
+
+<script src="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.css" rel="stylesheet">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 <script>
     // Make sure this URL is correct and points to your deployed Render backend
     const BACKEND_URL = 'YOUR_RENDER_BACKEND_URL_HERE'; // <-- Confirm this is your actual Render URL
