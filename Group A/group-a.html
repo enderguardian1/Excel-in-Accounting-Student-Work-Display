@@ -13,17 +13,29 @@
             padding: 20px;
             background-color: #D4D4D4;
         }
-        /* Changed from #sheet-container to #excel-container for main table */
+        /* Container for the single sheet view */
         #excel-container { 
             margin-top: 20px;
         }
-        .sheet-table-container {
-            margin-bottom: 20px;
+        /* Container for all sheets view */
+        #all-sheets-container {
+            margin-top: 20px;
+            display: none; /* Hidden by default */
         }
-        .sheet-table-container h2 {
+        .sheet-table-wrapper {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .sheet-table-wrapper h2 {
             margin-top: 0;
-            font-size: 1.2em;
-            margin-bottom: 10px;
+            font-size: 1.5em;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
         }
         #button-container {
             display: flex;
@@ -62,6 +74,10 @@
         #view-all-button:hover {
             background-color: #ccc;
         }
+        #view-all-button.active { /* Style for active "View All" button */
+            background-color: #007BFF;
+            color: white;
+        }
         #back-to-portal {
             margin-top: 20px;
             padding: 10px 20px;
@@ -79,7 +95,7 @@
         }
 
         /* Styling for the save status message */
-        #saveStatus { /* Corrected ID from save-status to saveStatus */
+        #saveStatus {
             margin-top: 10px;
             font-weight: bold;
         }
@@ -101,197 +117,270 @@
         <button id="view-all-button">View All Sheets</button>
     </div>
 
+    <div id="saveStatus" style="margin-top: 10px; font-weight: bold;"></div> 
+
     <div id="excel-container"></div> 
 
-    <div id="saveStatus" style="margin-top: 10px; font-weight: bold;"></div> 
+    <div id="all-sheets-container">
+        </div>
 
     <button id="back-to-portal">Back to Portal</button>
 
     <script src="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
-<script>
-    // Backend URL - IMPORTANT: This must be your actual Render backend URL
-    const BACKEND_URL = 'https://accounting-project-backend.onrender.com';
+    <script>
+        // Backend URL - IMPORTANT: This must be your actual Render backend URL
+        const BACKEND_URL = 'https://accounting-project-backend.onrender.com';
 
-    // Get the HTML container for Handsontable
-    const container = document.getElementById('excel-container');
-    // Get the save status message div
-    const saveStatusDiv = document.getElementById('saveStatus');
+        // HTML containers
+        const singleSheetContainer = document.getElementById('excel-container');
+        const allSheetsContainer = document.getElementById('all-sheets-container');
+        const saveStatusDiv = document.getElementById('saveStatus');
 
-    let hot; // Declare Handsontable instance globally
+        let hot; // For the single sheet Handsontable instance
+        let allHotInstances = {}; // To store references to multiple Handsontable instances in "View All" mode
 
-    // Define the active sheet name, now as 'let' so it can change
-    let activeSheetName = 'CHARTS OF ACCOUNTS'; // Default active sheet
+        // Define all known sheet names. Ensure these match your button data-sheet attributes exactly.
+        const ALL_SHEET_NAMES = [
+            'CHARTS OF ACCOUNTS',
+            'GENERAL JOURNAL',
+            'LEDGER',
+            'TRAIL BALANCE',
+            'ACCOUNTS'
+        ];
 
-    // Function to display status messages
-    function showStatus(message, isError = false) {
-        if (saveStatusDiv) {
-            saveStatusDiv.textContent = message;
-            saveStatusDiv.className = isError ? 'error' : 'success';
-            setTimeout(() => {
-                saveStatusDiv.textContent = '';
-                saveStatusDiv.className = '';
-            }, 3000); // Clear message after 3 seconds
+        let currentViewMode = 'single'; // 'single' or 'all'
+        let activeSheetName = ALL_SHEET_NAMES[0]; // Default active sheet for single view
+
+        // Function to display status messages
+        function showStatus(message, isError = false) {
+            if (saveStatusDiv) {
+                saveStatusDiv.textContent = message;
+                saveStatusDiv.className = isError ? 'error' : 'success';
+                setTimeout(() => {
+                    saveStatusDiv.textContent = '';
+                    saveStatusDiv.className = '';
+                }, 3000); // Clear message after 3 seconds
+            }
         }
-    }
 
-    // Function to send data to the backend
-    async function saveData(changes) {
-        console.log("saveData received changes:", changes);
+        // Function to send data to the backend
+        // Now takes 'sheet' as an explicit argument
+        async function saveData(changes, sheet) {
+            console.log(`saveData received changes for sheet "${sheet}":`, changes);
 
-        if (!changes || changes.length === 0) {
-            return; // No changes to save
+            if (!changes || changes.length === 0) {
+                return; // No changes to save
+            }
+
+            const transformedChanges = changes.map(([row, col, oldValue, newValue]) => ({
+                sheetName: sheet, // Use the sheet name explicitly passed to this function
+                row,
+                col,
+                cellValue: newValue
+            }));
+
+            console.log("Transformed changes for saving:", transformedChanges);
+
+            try {
+                showStatus('Saving data...');
+                const response = await fetch(`${BACKEND_URL}/api/updateExcel`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(transformedChanges)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                }
+
+                const result = await response.json();
+                console.log('Frontend: Save successful:', result);
+                showStatus('Data saved successfully!', false);
+            } catch (error) {
+                console.error('Frontend: Network error during save:', error);
+                showStatus(`Save failed: ${error.message}`, true);
+            }
         }
 
-        const transformedChanges = changes.map(([row, col, oldValue, newValue]) => ({
-            sheetName: activeSheetName, // Use the dynamically defined activeSheetName
-            row,
-            col,
-            cellValue: newValue
-        }));
+        // Initialize a single Handsontable instance for a given sheet
+        function initializeSingleHandsontable(containerElement, sheetName, allSavedData) {
+            if (!containerElement) {
+                console.error(`Handsontable container element for "${sheetName}" not found!`);
+                return null;
+            }
 
-        console.log("Transformed changes for saving:", transformedChanges);
+            // Create a default empty spreadsheet data structure (e.g., 10x10)
+            const defaultData = Handsontable.helper.createEmptySpreadsheetData(10, 10);
+            
+            // Filter data for the specific sheet
+            const sheetSpecificData = allSavedData.filter(cell => 
+                cell.sheetName && cell.sheetName.trim() === sheetName.trim()
+            );
 
-        try {
-            showStatus('Saving data...');
-            const response = await fetch(`${BACKEND_URL}/api/updateExcel`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(transformedChanges)
+            const newHot = new Handsontable(containerElement, {
+                data: defaultData, // Start with empty data, then populate from fetched data
+                rowHeaders: true,
+                colHeaders: true,
+                contextMenu: true,
+                manualColumnResize: true,
+                manualRowResize: true,
+                width: '100%',
+                height: 'auto',
+                stretchH: 'all',
+                licenseKey: 'non-commercial-and-evaluation', // Add this to suppress license warning
+                afterChange: function(changes, source) {
+                    console.log(`afterChange triggered for sheet "${sheetName}". Source:`, source, "Raw Changes:", changes);
+
+                    if (source === 'loadData') {
+                        return; // Don't save changes that came from loading data
+                    }
+                    // Pass the specific sheetName to saveData
+                    saveData(changes, sheetName); 
+                }
             });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+            // Populate the table with fetched data specific to this sheet
+            if (sheetSpecificData.length > 0) {
+                sheetSpecificData.forEach(cell => {
+                    newHot.setDataAtCell(cell.row, cell.col, cell.cellValue, 'loadData');
+                });
             }
-
-            const result = await response.json();
-            console.log('Frontend: Save successful:', result);
-            showStatus('Data saved successfully!', false);
-        } catch (error) {
-            console.error('Frontend: Network error during save:', error);
-            showStatus(`Save failed: ${error.message}`, true);
-        }
-    }
-
-    // Initialize Handsontable with data for the current activeSheetName
-    async function initializeHandsontable(allSavedData) {
-        if (!container) {
-            console.error("Handsontable container element not found! Check HTML ID.");
-            return;
+            newHot.render(); // Ensure the table is rendered after data is set
+            return newHot;
         }
 
-        // Destroy existing instance if it exists
-        if (hot) {
-            hot.destroy();
-        }
-
-        // Create a default empty spreadsheet data structure (e.g., 10x10)
-        const defaultData = Handsontable.helper.createEmptySpreadsheetData(10, 10);
-
-        hot = new Handsontable(container, {
-            data: defaultData, // Start with empty data, then populate from fetched data
-            rowHeaders: true,
-            colHeaders: true,
-            contextMenu: true,
-            manualColumnResize: true,
-            manualRowResize: true,
-            width: '100%',
-            height: 'auto',
-            stretchH: 'all',
-            licenseKey: 'non-commercial-and-evaluation', // Add this to suppress license warning
-            afterChange: function(changes, source) {
-                console.log("afterChange triggered. Source:", source, "Raw Changes:", changes);
-
-                // This callback fires after any change in the table
-                if (source === 'loadData') {
-                    return; // Don't save changes that came from loading data
+        // Function to fetch ALL data from backend (used by both single and all views)
+        async function fetchAllData() {
+            showStatus('Loading data...');
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/getExcelData`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
-                saveData(changes); // Call saveData function
+                const data = await response.json();
+                console.log('Frontend: All data loaded successfully:', data);
+                showStatus('Data loaded successfully!', false);
+                return data;
+            } catch (error) {
+                console.error('Frontend: Network error during data load:', error);
+                showStatus(`Failed to load data: ${error.message}`, true);
+                return []; // Return empty array on error
             }
+        }
+
+        // --- View Management Functions ---
+
+        // Destroy all existing Handsontable instances
+        function destroyAllHandsontableInstances() {
+            if (hot) { // Destroy single view instance if exists
+                hot.destroy();
+                hot = null;
+            }
+            for (const sheetName in allHotInstances) { // Destroy all "View All" instances
+                if (allHotInstances[sheetName]) {
+                    allHotInstances[sheetName].destroy();
+                }
+            }
+            allHotInstances = {}; // Clear the object
+            allSheetsContainer.innerHTML = ''; // Clear all dynamically added divs
+        }
+
+        // Render the single sheet view
+        async function renderSingleSheetView() {
+            destroyAllHandsontableInstances(); // Clean up any other views
+            currentViewMode = 'single';
+            singleSheetContainer.style.display = 'block'; // Show single container
+            allSheetsContainer.style.display = 'none'; // Hide all sheets container
+
+            const allSavedData = await fetchAllData();
+            hot = initializeSingleHandsontable(singleSheetContainer, activeSheetName, allSavedData);
+            updateSheetButtons(); // Update active button styling
+        }
+
+        // Render the multiple sheets view
+        async function renderAllSheetsView() {
+            destroyAllHandsontableInstances(); // Clean up any other views
+            currentViewMode = 'all';
+            singleSheetContainer.style.display = 'none'; // Hide single container
+            allSheetsContainer.style.display = 'block'; // Show all sheets container
+
+            const allSavedData = await fetchAllData();
+
+            ALL_SHEET_NAMES.forEach(sheetName => {
+                // Create a div for each sheet's Handsontable
+                const sheetWrapper = document.createElement('div');
+                sheetWrapper.className = 'sheet-table-wrapper';
+                
+                const title = document.createElement('h2');
+                title.textContent = `Sheet: ${sheetName}`;
+                sheetWrapper.appendChild(title);
+
+                const sheetContainer = document.createElement('div');
+                sheetContainer.id = `handsontable-container-${sheetName.replace(/\s/g, '-')}`; // Unique ID for each table
+                sheetWrapper.appendChild(sheetContainer);
+                allSheetsContainer.appendChild(sheetWrapper);
+
+                // Initialize Handsontable for this specific sheet
+                const sheetHot = initializeSingleHandsontable(sheetContainer, sheetName, allSavedData);
+                if (sheetHot) {
+                    allHotInstances[sheetName] = sheetHot; // Store reference
+                }
+            });
+            updateSheetButtons(); // Update active button styling
+        }
+
+        // Function to update active button styling
+        function updateSheetButtons() {
+            document.querySelectorAll('#button-container button').forEach(button => {
+                if (button.id === 'view-all-button') {
+                    if (currentViewMode === 'all') {
+                        button.classList.add('active');
+                    } else {
+                        button.classList.remove('active');
+                    }
+                } else {
+                    const sheet = button.getAttribute('data-sheet');
+                    if (currentViewMode === 'single' && sheet && sheet.trim() === activeSheetName.trim()) {
+                        button.classList.add('active');
+                    } else {
+                        button.classList.remove('active');
+                    }
+                }
+            });
+        }
+
+        // --- Event Listeners ---
+
+        // Event listener for "Back to Portal" button
+        document.getElementById('back-to-portal').addEventListener('click', () => {
+            window.location.href = '../index.html'; // Adjust path if needed
         });
 
-        // Populate the table with fetched data, filtered by activeSheetName
-        if (allSavedData && allSavedData.length > 0) {
-            allSavedData.forEach(cell => {
-                // Check if cell data belongs to the active sheet
-                if (cell.sheetName && cell.sheetName.trim() === activeSheetName.trim()) {
-                    hot.setDataAtCell(cell.row, cell.col, cell.cellValue, 'loadData');
-                }
-            });
-        }
-        hot.render(); // Ensure the table is rendered after data is set
-    }
-
-    // Function to fetch data from backend and then initialize Handsontable
-    async function loadDataAndInitializeHandsontable() {
-        showStatus('Loading data...');
-        try {
-            const response = await fetch(`${BACKEND_URL}/api/getExcelData`);
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-            }
-            const data = await response.json();
-            console.log('Frontend: Data loaded successfully:', data);
-            initializeHandsontable(data); // Initialize Handsontable with the fetched data
-            showStatus('Data loaded successfully!', false);
-        } catch (error) {
-            console.error('Frontend: Network error during data load:', error);
-            showStatus(`Failed to load data: ${error.message}`, true);
-            initializeHandsontable([]); // Initialize an empty table even if loading fails
-        }
-    }
-
-    // Function to handle sheet switching
-    async function switchSheet(newSheetName) {
-        activeSheetName = newSheetName; // Update the global active sheet name
-        updateSheetButtons(); // Update button styling
-
-        // Now, reload all data and re-initialize Handsontable for the new sheet
-        await loadDataAndInitializeHandsontable();
-    }
-
-    // Function to update active button styling
-    function updateSheetButtons() {
+        // Event listener for single sheet selection buttons
         document.querySelectorAll('#button-container button[data-sheet]').forEach(button => {
-            if (button.getAttribute('data-sheet').trim() === activeSheetName.trim()) {
-                button.classList.add('active');
-            } else {
-                button.classList.remove('active');
-            }
+            button.addEventListener('click', function() {
+                activeSheetName = this.getAttribute('data-sheet'); // Update active sheet
+                renderSingleSheetView(); // Render the single sheet view
+            });
         });
-    }
 
-    // Event listener for "Back to Portal" button
-    document.getElementById('back-to-portal').addEventListener('click', () => {
-        window.location.href = '../index.html'; // Adjust path if needed
-    });
-
-    // Event listener for sheet selection buttons
-    document.querySelectorAll('#button-container button[data-sheet]').forEach(button => {
-        button.addEventListener('click', function() {
-            const sheet = this.getAttribute('data-sheet');
-            switchSheet(sheet); // Call the new switchSheet function
+        // Event listener for "View All Sheets" button
+        document.getElementById('view-all-button').addEventListener('click', () => {
+            renderAllSheetsView(); // Render the all sheets view
         });
-    });
 
-    // Event listener for "View All Sheets" button
-    document.getElementById('view-all-button').addEventListener('click', () => {
-        alert("View All Sheets functionality not implemented yet. Please select a specific sheet.");
-        // This is where you would implement logic to display data from all sheets or a summary
-    });
+        // Initial setup when the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            // Start with the default single sheet view
+            renderSingleSheetView(); 
+        });
 
-
-    // Call the function to load data and initialize Handsontable when the DOM is fully loaded
-    document.addEventListener('DOMContentLoaded', () => {
-        updateSheetButtons(); // Set initial active button
-        loadDataAndInitializeHandsontable(); // Load data for the default sheet
-    });
-
-</script>
+    </script>
 </body>
 </html>
