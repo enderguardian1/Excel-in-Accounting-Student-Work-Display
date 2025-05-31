@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Group B Excel Data Viewer</title>
+    <base href="./">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.css">
+    <link rel="stylesheet" href="../style.css">
+    <style>
+        /* Minimal styling with button styles */
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color: #D4D4D4;
+        }
+        /* Container for the single sheet view */
+        #excel-container { 
+            margin-top: 20px;
+        }
+        /* Container for all sheets view */
+        #all-sheets-container {
+            margin-top: 20px;
+            display: none; /* Hidden by default */
+        }
+        .sheet-table-wrapper {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .sheet-table-wrapper h2 {
+            margin-top: 0;
+            font-size: 1.5em;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        #button-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        #button-container button {
+            padding: 12px 18px;
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 5% !important; /* Specific styling for buttons */
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        #button-container button:hover {
+            background-color: #222;
+        }
+        #button-container button.active {
+            background-color: #4CAF50;
+            color: white;
+        }
+        #view-all-button {
+            padding: 12px 18px;
+            background-color: #e0e0e0;
+            color: #333;
+            border: none;
+            border-radius: 5% !important; /* Specific styling for buttons */
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        #view-all-button:hover {
+            background-color: #ccc;
+        }
+        #view-all-button.active { 
+            background-color: #007BFF;
+            color: white;
+        }
+        #back-to-portal {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5% !important; /* Specific styling for buttons */
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+
+        #back-to-portal:hover {
+            background-color: #0056b3;
+        }
+
+        /* Styling for the save status message */
+        #saveStatus {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        #saveStatus.success {
+            color: green;
+        }
+        #saveStatus.error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div id="button-container">
+        </div>
+
+    <div id="saveStatus" style="margin-top: 10px; font-weight: bold;"></div> 
+
+    <div id="excel-container"></div> 
+
+    <div id="all-sheets-container">
+        </div>
+
+    <button id="back-to-portal">Back to Portal</button>
+
+    <script src="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <script>
+        // Backend URL - IMPORTANT: This must be your actual Render backend URL
+        const BACKEND_URL = 'https://accounting-project-backend.onrender.com';
+
+        // HTML containers
+        const buttonContainer = document.getElementById('button-container');
+        const singleSheetContainer = document.getElementById('excel-container');
+        const allSheetsContainer = document.getElementById('all-sheets-container');
+        const saveStatusDiv = document.getElementById('saveStatus');
+
+        let hot; 
+        let allHotInstances = {};
+
+        // Define all known sheet names and their dimensions (TEAM B.xlsx only)
+        const ALL_SHEET_NAMES = [
+            'TEAM B.xlsx - CHARTS OF ACCOUNTS',
+            'TEAM B.xlsx - GENERAL JOURNAL',
+            'TEAM B.xlsx - LEDGER',
+            'TEAM B.xlsx - Trail Balance'
+        ];
+
+        const SHEET_DIMENSIONS = {
+            'TEAM B.xlsx - CHARTS OF ACCOUNTS': { rows: 12, cols: 2 },
+            'TEAM B.xlsx - GENERAL JOURNAL': { rows: 14, cols: 8 },
+            'TEAM B.xlsx - LEDGER': { rows: 22, cols: 9 },
+            'TEAM B.xlsx - Trail Balance': { rows: 15, cols: 5 }
+        };
+
+        let currentViewMode = 'single';
+        let activeSheetName = ALL_SHEET_NAMES[0]; 
+
+        function showStatus(message, isError = false) {
+            if (saveStatusDiv) {
+                saveStatusDiv.textContent = message;
+                saveStatusDiv.className = isError ? 'error' : 'success';
+                setTimeout(() => {
+                    saveStatusDiv.textContent = '';
+                    saveStatusDiv.className = '';
+                }, 3000);
+            }
+        }
+
+        async function saveData(changes, sheet) {
+            if (!changes || changes.length === 0) return;
+            const transformedChanges = changes.map(([row, col, oldValue, newValue]) => ({
+                sheetName: sheet, row, col, cellValue: newValue
+            }));
+            try {
+                showStatus('Saving data...');
+                const response = await fetch(`${BACKEND_URL}/api/updateExcel`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(transformedChanges)
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                }
+                const result = await response.json();
+                showStatus('Data saved successfully!', false);
+            } catch (error) {
+                showStatus(`Save failed: ${error.message}`, true);
+            }
+        }
+
+        function initializeSingleHandsontable(containerElement, sheetName, allSavedData) {
+            if (!containerElement) return null;
+            const dimensions = SHEET_DIMENSIONS[sheetName] || { rows: 10, cols: 10 };
+            const defaultData = Handsontable.helper.createEmptySpreadsheetData(dimensions.rows, dimensions.cols);
+            const sheetSpecificData = allSavedData.filter(cell => cell.sheetName && cell.sheetName.trim() === sheetName.trim());
+
+            const newHot = new Handsontable(containerElement, {
+                data: defaultData, rowHeaders: true, colHeaders: true, contextMenu: true,
+                manualColumnResize: true, manualRowResize: true, width: '100%', height: 'auto',
+                stretchH: 'all', licenseKey: 'non-commercial-and-evaluation',
+                afterChange: function(changes, source) {
+                    if (source === 'loadData') return;
+                    saveData(changes, sheetName); 
+                }
+            });
+            if (sheetSpecificData.length > 0) {
+                sheetSpecificData.forEach(cell => {
+                    if (cell.row < dimensions.rows && cell.col < dimensions.cols) {
+                        newHot.setDataAtCell(cell.row, cell.col, cell.cellValue, 'loadData');
+                    }
+                });
+            }
+            newHot.render();
+            return newHot;
+        }
+
+        async function fetchAllData() {
+            showStatus('Loading data...');
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/getExcelData`);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                }
+                const data = await response.json();
+                showStatus('Data loaded successfully!', false);
+                return data;
+            } catch (error) {
+                showStatus(`Failed to load data: ${error.message}`, true);
+                return [];
+            }
+        }
+
+        function destroyAllHandsontableInstances() {
+            if (hot) { hot.destroy(); hot = null; }
+            for (const sheetName in allHotInstances) { if (allHotInstances[sheetName]) allHotInstances[sheetName].destroy(); }
+            allHotInstances = {};
+            allSheetsContainer.innerHTML = '';
+        }
+
+        async function renderSingleSheetView() {
+            destroyAllHandsontableInstances();
+            currentViewMode = 'single';
+            singleSheetContainer.style.display = 'block';
+            allSheetsContainer.style.display = 'none';
+            const allSavedData = await fetchAllData();
+            hot = initializeSingleHandsontable(singleSheetContainer, activeSheetName, allSavedData);
+            updateSheetButtons();
+        }
+
+        async function renderAllSheetsView() {
+            destroyAllHandsontableInstances();
+            currentViewMode = 'all';
+            singleSheetContainer.style.display = 'none';
+            allSheetsContainer.style.display = 'block';
+            const allSavedData = await fetchAllData();
+
+            ALL_SHEET_NAMES.forEach(sheetName => {
+                const sheetWrapper = document.createElement('div');
+                sheetWrapper.className = 'sheet-table-wrapper';
+                const title = document.createElement('h2');
+                title.textContent = `Sheet: ${sheetName}`;
+                sheetWrapper.appendChild(title);
+                const sheetContainer = document.createElement('div');
+                sheetContainer.id = `handsontable-container-${sheetName.replace(/[^a-zA-Z0-9-]/g, '_')}`;
+                sheetWrapper.appendChild(sheetContainer);
+                allSheetsContainer.appendChild(sheetWrapper);
+                const sheetHot = initializeSingleHandsontable(sheetContainer, sheetName, allSavedData);
+                if (sheetHot) allHotInstances[sheetName] = sheetHot;
+            });
+            updateSheetButtons();
+        }
+
+        function updateSheetButtons() {
+            document.querySelectorAll('#button-container button').forEach(button => {
+                if (button.id === 'view-all-button') {
+                    if (currentViewMode === 'all') button.classList.add('active'); else button.classList.remove('active');
+                } else {
+                    const sheet = button.getAttribute('data-sheet');
+                    if (currentViewMode === 'single' && sheet && sheet.trim() === activeSheetName.trim()) button.classList.add('active'); else button.classList.remove('active');
+                }
+            });
+        }
+
+        function createSheetButtons() {
+            const filePrefixes = ['TEAM B.xlsx - ']; // Only prefix for TEAM B.xlsx
+
+            ALL_SHEET_NAMES.forEach(sheetName => {
+                const button = document.createElement('button');
+                button.setAttribute('data-sheet', sheetName);
+                let buttonText = sheetName;
+                for (const prefix of filePrefixes) {
+                    if (buttonText.startsWith(prefix)) {
+                        buttonText = buttonText.substring(prefix.length);
+                        break;
+                    }
+                }
+                button.textContent = buttonText;
+                buttonContainer.appendChild(button);
+            });
+            const viewAllButton = document.createElement('button');
+            viewAllButton.id = 'view-all-button';
+            viewAllButton.textContent = 'View All Sheets';
+            buttonContainer.appendChild(viewAllButton);
+        }
+
+        function assignButtonListeners() {
+            document.getElementById('back-to-portal').addEventListener('click', () => {
+                window.location.href = '../index.html';
+            });
+            document.querySelectorAll('#button-container button[data-sheet]').forEach(button => {
+                button.addEventListener('click', function() {
+                    activeSheetName = this.getAttribute('data-sheet');
+                    renderSingleSheetView();
+                });
+            });
+            document.getElementById('view-all-button').addEventListener('click', () => {
+                renderAllSheetsView();
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            createSheetButtons();
+            assignButtonListeners();
+            renderSingleSheetView(); 
+        });
+
+    </script>
+</body>
+</html>

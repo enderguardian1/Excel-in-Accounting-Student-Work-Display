@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Excel Data Viewer</title>
+    <title>Group A Excel Data Viewer</title>
     <base href="./">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.css">
     <link rel="stylesheet" href="../style.css">
@@ -148,7 +148,7 @@
         const SHEET_DIMENSIONS = {
             'TEAM A.xlsx - CHARTS OF ACCOUNTS': { rows: 20, cols: 2 },
             'TEAM A.xlsx - GENERAL JOURNAL': { rows: 15, cols: 8 },
-            'TEAM A.xlsx - Sheet1': { rows: 16, cols: 5 }, // Updated dimensions
+            'TEAM A.xlsx - Sheet1': { rows: 16, cols: 5 }, 
             'TEAM A.xlsx - ledger': { rows: 20, cols: 9 },
             'TEAM A.xlsx - Trail Blance': { rows: 20, cols: 5 }
         };
@@ -370,16 +370,25 @@
 
         // Dynamically create sheet buttons
         function createSheetButtons() {
-            const fileNamePrefix = 'TEAM A.xlsx - '; // The prefix to remove from button names
+            const filePrefixes = [ // List of all possible prefixes to remove from button text
+                'TEAM A.xlsx - ',
+                'TEAM B.xlsx - ',
+                'INVOICE ( TEAM C).xlsx - ',
+                'Income statement ( F).xlsx - ',
+                'Balnce sheet ( TEAM D ).xlsx - '
+            ];
 
             ALL_SHEET_NAMES.forEach(sheetName => {
                 const button = document.createElement('button');
                 button.setAttribute('data-sheet', sheetName); // Full unique name for internal use
                 
-                // Display text for the button (remove prefix)
+                // Display text for the button (remove relevant prefix)
                 let buttonText = sheetName;
-                if (sheetName.startsWith(fileNamePrefix)) {
-                    buttonText = sheetName.substring(fileNamePrefix.length);
+                for (const prefix of filePrefixes) {
+                    if (buttonText.startsWith(prefix)) {
+                        buttonText = buttonText.substring(prefix.length);
+                        break; // Found and removed a prefix, no need to check others
+                    }
                 }
                 button.textContent = buttonText;
 
