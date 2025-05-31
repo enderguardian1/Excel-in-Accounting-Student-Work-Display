@@ -136,7 +136,7 @@
         let hot; // For the single sheet Handsontable instance
         let allHotInstances = {}; // To store references to multiple Handsontable instances in "View All" mode
 
-        // Define all known sheet names and their dimensions based on your provided list (TEAM A.xlsx only)
+        // Define all known sheet names and their dimensions (TEAM A.xlsx only)
         const ALL_SHEET_NAMES = [
             'TEAM A.xlsx - CHARTS OF ACCOUNTS',
             'TEAM A.xlsx - GENERAL JOURNAL',
@@ -329,7 +329,7 @@
                 sheetWrapper.className = 'sheet-table-wrapper';
                 
                 const title = document.createElement('h2');
-                title.textContent = `Sheet: ${sheetName}`;
+                title.textContent = `Sheet: ${sheetName}`; // Keep full name for title
                 sheetWrapper.appendChild(title);
 
                 const sheetContainer = document.createElement('div');
@@ -370,10 +370,19 @@
 
         // Dynamically create sheet buttons
         function createSheetButtons() {
+            const fileNamePrefix = 'TEAM A.xlsx - '; // The prefix to remove from button names
+
             ALL_SHEET_NAMES.forEach(sheetName => {
                 const button = document.createElement('button');
-                button.setAttribute('data-sheet', sheetName);
-                button.textContent = sheetName;
+                button.setAttribute('data-sheet', sheetName); // Full unique name for internal use
+                
+                // Display text for the button (remove prefix)
+                let buttonText = sheetName;
+                if (sheetName.startsWith(fileNamePrefix)) {
+                    buttonText = sheetName.substring(fileNamePrefix.length);
+                }
+                button.textContent = buttonText;
+
                 buttonContainer.appendChild(button);
             });
             // Add the 'View All Sheets' button last
