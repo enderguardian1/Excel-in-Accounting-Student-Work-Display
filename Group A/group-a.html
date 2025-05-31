@@ -109,13 +109,7 @@
 </head>
 <body>
     <div id="button-container">
-        <button data-sheet="CHARTS OF ACCOUNTS">CHARTS OF ACCOUNTS</button>
-        <button data-sheet="GENERAL JOURNAL">GENERAL JOURNAL</button>
-        <button data-sheet="LEDGER">LEDGER</button>
-        <button data-sheet="TRAIL BALANCE">TRAIL BALANCE</button>
-        <button data-sheet="ACCOUNTS">ACCOUNTS</button>
-        <button id="view-all-button">View All Sheets</button>
-    </div>
+        </div>
 
     <div id="saveStatus" style="margin-top: 10px; font-weight: bold;"></div> 
 
@@ -134,6 +128,7 @@
         const BACKEND_URL = 'https://accounting-project-backend.onrender.com';
 
         // HTML containers
+        const buttonContainer = document.getElementById('button-container');
         const singleSheetContainer = document.getElementById('excel-container');
         const allSheetsContainer = document.getElementById('all-sheets-container');
         const saveStatusDiv = document.getElementById('saveStatus');
@@ -141,17 +136,46 @@
         let hot; // For the single sheet Handsontable instance
         let allHotInstances = {}; // To store references to multiple Handsontable instances in "View All" mode
 
-        // Define all known sheet names. Ensure these match your button data-sheet attributes exactly.
+        // Define all known sheet names and their dimensions based on your provided list
         const ALL_SHEET_NAMES = [
-            'CHARTS OF ACCOUNTS',
-            'GENERAL JOURNAL',
-            'LEDGER',
-            'TRAIL BALANCE',
-            'ACCOUNTS'
+            'TEAM A.xlsx - CHARTS OF ACCOUNTS',
+            'TEAM A.xlsx - GENERAL JOURNAL',
+            'TEAM A.xlsx - Sheet1',
+            'TEAM A.xlsx - ledger',
+            'TEAM A.xlsx - Trail Blance',
+            'TEAM B.xlsx - CHARTS OF ACCOUNTS',
+            'TEAM B.xlsx - GENERAL JOURNAL',
+            'TEAM B.xlsx - LEDGER',
+            'TEAM B.xlsx - Trail Balance',
+            'INVOICE ( TEAM C).xlsx - Invoice',
+            'INVOICE ( TEAM C).xlsx - Item name',
+            'Income statement ( F).xlsx - INCOME STATEMENT (2)',
+            'Income statement ( F).xlsx - INCOME STATEMENT',
+            'Balnce sheet ( TEAM D ).xlsx - BALANCE SHEET (2)',
+            'Balnce sheet ( TEAM D ).xlsx - PIE CHART'
         ];
 
+        const SHEET_DIMENSIONS = {
+            'TEAM A.xlsx - CHARTS OF ACCOUNTS': { rows: 20, cols: 2 },
+            'TEAM A.xlsx - GENERAL JOURNAL': { rows: 15, cols: 8 },
+            'TEAM A.xlsx - Sheet1': { rows: 3, cols: 1 },
+            'TEAM A.xlsx - ledger': { rows: 20, cols: 9 },
+            'TEAM A.xlsx - Trail Blance': { rows: 20, cols: 5 },
+            'TEAM B.xlsx - CHARTS OF ACCOUNTS': { rows: 12, cols: 2 },
+            'TEAM B.xlsx - GENERAL JOURNAL': { rows: 14, cols: 8 },
+            'TEAM B.xlsx - LEDGER': { rows: 22, cols: 9 },
+            'TEAM B.xlsx - Trail Balance': { rows: 15, cols: 5 },
+            'INVOICE ( TEAM C).xlsx - Invoice': { rows: 18, cols: 7 },
+            'INVOICE ( TEAM C).xlsx - Item name': { rows: 6, cols: 2 },
+            'Income statement ( F).xlsx - INCOME STATEMENT (2)': { rows: 20, cols: 5 },
+            'Income statement ( F).xlsx - INCOME STATEMENT': { rows: 20, cols: 5 },
+            'Balnce sheet ( TEAM D ).xlsx - BALANCE SHEET (2)': { rows: 20, cols: 5 },
+            'Balnce sheet ( TEAM D ).xlsx - PIE CHART': { rows: 11, cols: 2 }
+        };
+
+
         let currentViewMode = 'single'; // 'single' or 'all'
-        let activeSheetName = ALL_SHEET_NAMES[0]; // Default active sheet for single view
+        let activeSheetName = ALL_SHEET_NAMES[0]; // Default active sheet (first one in the list)
 
         // Function to display status messages
         function showStatus(message, isError = false) {
@@ -214,8 +238,10 @@
                 return null;
             }
 
-            // Create a default empty spreadsheet data structure (e.g., 10x10)
-            const defaultData = Handsontable.helper.createEmptySpreadsheetData(10, 10);
+            const dimensions = SHEET_DIMENSIONS[sheetName] || { rows: 10, cols: 10 }; // Fallback to 10x10 if dimensions not found
+
+            // Create an empty spreadsheet data structure with specified dimensions
+            const defaultData = Handsontable.helper.createEmptySpreadsheetData(dimensions.rows, dimensions.cols);
             
             // Filter data for the specific sheet
             const sheetSpecificData = allSavedData.filter(cell => 
@@ -247,7 +273,12 @@
             // Populate the table with fetched data specific to this sheet
             if (sheetSpecificData.length > 0) {
                 sheetSpecificData.forEach(cell => {
-                    newHot.setDataAtCell(cell.row, cell.col, cell.cellValue, 'loadData');
+                    // Check if cell.row and cell.col are within the current dimensions before setting data
+                    if (cell.row < dimensions.rows && cell.col < dimensions.cols) {
+                        newHot.setDataAtCell(cell.row, cell.col, cell.cellValue, 'loadData');
+                    } else {
+                        console.warn(`Data for sheet "${sheetName}" at (${cell.row}, ${cell.col}) ignored as it's outside current dimensions.`);
+                    }
                 });
             }
             newHot.render(); // Ensure the table is rendered after data is set
@@ -322,7 +353,7 @@
                 sheetWrapper.appendChild(title);
 
                 const sheetContainer = document.createElement('div');
-                sheetContainer.id = `handsontable-container-${sheetName.replace(/\s/g, '-')}`; // Unique ID for each table
+                sheetContainer.id = `handsontable-container-${sheetName.replace(/[^a-zA-Z0-9-]/g, '_')}`; // Sanitize ID for safety
                 sheetWrapper.appendChild(sheetContainer);
                 allSheetsContainer.appendChild(sheetWrapper);
 
@@ -355,29 +386,50 @@
             });
         }
 
-        // --- Event Listeners ---
+        // --- Initial Setup and Event Listeners ---
 
-        // Event listener for "Back to Portal" button
-        document.getElementById('back-to-portal').addEventListener('click', () => {
-            window.location.href = '../index.html'; // Adjust path if needed
-        });
-
-        // Event listener for single sheet selection buttons
-        document.querySelectorAll('#button-container button[data-sheet]').forEach(button => {
-            button.addEventListener('click', function() {
-                activeSheetName = this.getAttribute('data-sheet'); // Update active sheet
-                renderSingleSheetView(); // Render the single sheet view
+        // Dynamically create sheet buttons
+        function createSheetButtons() {
+            ALL_SHEET_NAMES.forEach(sheetName => {
+                const button = document.createElement('button');
+                button.setAttribute('data-sheet', sheetName);
+                button.textContent = sheetName;
+                buttonContainer.appendChild(button);
             });
-        });
+            // Add the 'View All Sheets' button last
+            const viewAllButton = document.createElement('button');
+            viewAllButton.id = 'view-all-button';
+            viewAllButton.textContent = 'View All Sheets';
+            buttonContainer.appendChild(viewAllButton);
+        }
 
-        // Event listener for "View All Sheets" button
-        document.getElementById('view-all-button').addEventListener('click', () => {
-            renderAllSheetsView(); // Render the all sheets view
-        });
+        // Assign event listeners after buttons are created
+        function assignButtonListeners() {
+            // Event listener for "Back to Portal" button
+            document.getElementById('back-to-portal').addEventListener('click', () => {
+                window.location.href = '../index.html'; // Adjust path if needed
+            });
+
+            // Event listener for single sheet selection buttons
+            document.querySelectorAll('#button-container button[data-sheet]').forEach(button => {
+                button.addEventListener('click', function() {
+                    activeSheetName = this.getAttribute('data-sheet'); // Update active sheet
+                    renderSingleSheetView(); // Render the single sheet view
+                });
+            });
+
+            // Event listener for "View All Sheets" button
+            document.getElementById('view-all-button').addEventListener('click', () => {
+                renderAllSheetsView(); // Render the all sheets view
+            });
+        }
 
         // Initial setup when the DOM is fully loaded
         document.addEventListener('DOMContentLoaded', () => {
-            // Start with the default single sheet view
+            createSheetButtons(); // Create all buttons first
+            assignButtonListeners(); // Then assign their listeners
+
+            // Start with the default single sheet view (first sheet in the list)
             renderSingleSheetView(); 
         });
 
