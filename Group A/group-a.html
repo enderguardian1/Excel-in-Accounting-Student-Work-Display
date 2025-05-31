@@ -136,23 +136,13 @@
         let hot; // For the single sheet Handsontable instance
         let allHotInstances = {}; // To store references to multiple Handsontable instances in "View All" mode
 
-        // Define all known sheet names and their dimensions based on your provided list
+        // Define all known sheet names and their dimensions based on your provided list (TEAM A.xlsx only)
         const ALL_SHEET_NAMES = [
             'TEAM A.xlsx - CHARTS OF ACCOUNTS',
             'TEAM A.xlsx - GENERAL JOURNAL',
             'TEAM A.xlsx - Sheet1',
             'TEAM A.xlsx - ledger',
-            'TEAM A.xlsx - Trail Blance',
-            'TEAM B.xlsx - CHARTS OF ACCOUNTS',
-            'TEAM B.xlsx - GENERAL JOURNAL',
-            'TEAM B.xlsx - LEDGER',
-            'TEAM B.xlsx - Trail Balance',
-            'INVOICE ( TEAM C).xlsx - Invoice',
-            'INVOICE ( TEAM C).xlsx - Item name',
-            'Income statement ( F).xlsx - INCOME STATEMENT (2)',
-            'Income statement ( F).xlsx - INCOME STATEMENT',
-            'Balnce sheet ( TEAM D ).xlsx - BALANCE SHEET (2)',
-            'Balnce sheet ( TEAM D ).xlsx - PIE CHART'
+            'TEAM A.xlsx - Trail Blance'
         ];
 
         const SHEET_DIMENSIONS = {
@@ -160,17 +150,7 @@
             'TEAM A.xlsx - GENERAL JOURNAL': { rows: 15, cols: 8 },
             'TEAM A.xlsx - Sheet1': { rows: 3, cols: 1 },
             'TEAM A.xlsx - ledger': { rows: 20, cols: 9 },
-            'TEAM A.xlsx - Trail Blance': { rows: 20, cols: 5 },
-            'TEAM B.xlsx - CHARTS OF ACCOUNTS': { rows: 12, cols: 2 },
-            'TEAM B.xlsx - GENERAL JOURNAL': { rows: 14, cols: 8 },
-            'TEAM B.xlsx - LEDGER': { rows: 22, cols: 9 },
-            'TEAM B.xlsx - Trail Balance': { rows: 15, cols: 5 },
-            'INVOICE ( TEAM C).xlsx - Invoice': { rows: 18, cols: 7 },
-            'INVOICE ( TEAM C).xlsx - Item name': { rows: 6, cols: 2 },
-            'Income statement ( F).xlsx - INCOME STATEMENT (2)': { rows: 20, cols: 5 },
-            'Income statement ( F).xlsx - INCOME STATEMENT': { rows: 20, cols: 5 },
-            'Balnce sheet ( TEAM D ).xlsx - BALANCE SHEET (2)': { rows: 20, cols: 5 },
-            'Balnce sheet ( TEAM D ).xlsx - PIE CHART': { rows: 11, cols: 2 }
+            'TEAM A.xlsx - Trail Blance': { rows: 20, cols: 5 }
         };
 
 
