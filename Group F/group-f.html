@@ -37,20 +37,6 @@
             padding-bottom: 10px;
             margin-bottom: 15px;
         }
-        /* Styles for the image display areas */
-        #image-display-single-sheet, .sheet-image-display {
-            margin-bottom: 20px; /* Space below image before table */
-            text-align: center;
-        }
-        #image-display-single-sheet img, .sheet-image-display img {
-            max-width: 80%; /* Adjust as needed for your images */
-            height: auto;
-            border: 1px solid #ccc; /* Subtle border for images */
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Subtle shadow */
-            display: block; /* Ensures proper spacing and centering */
-            margin: 0 auto;
-        }
-
         #button-container {
             display: flex;
             flex-wrap: wrap;
@@ -63,7 +49,7 @@
             background-color: #444;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 5% !important; /* Specific styling for buttons */
             cursor: pointer;
             font-size: 16px;
             transition: background-color 0.3s ease;
@@ -80,7 +66,7 @@
             background-color: #e0e0e0;
             color: #333;
             border: none;
-            border-radius: 5px;
+            border-radius: 5% !important; /* Specific styling for buttons */
             cursor: pointer;
             font-size: 16px;
             transition: background-color 0.3s ease;
@@ -88,7 +74,7 @@
         #view-all-button:hover {
             background-color: #ccc;
         }
-        #view-all-button.active { /* Style for active "View All" button */
+        #view-all-button.active { 
             background-color: #007BFF;
             color: white;
         }
@@ -98,7 +84,7 @@
             background-color: #007BFF;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 5% !important; /* Specific styling for buttons */
             cursor: pointer;
             font-size: 16px;
             transition: background-color 0.3s ease;
@@ -123,14 +109,14 @@
 </head>
 <body>
     <div id="button-container">
-    </div>
+        </div>
 
     <div id="saveStatus" style="margin-top: 10px; font-weight: bold;"></div> 
 
-    <div id="image-display-single-sheet"></div> <div id="excel-container"></div> 
+    <div id="excel-container"></div> 
 
     <div id="all-sheets-container">
-    </div>
+        </div>
 
     <button id="back-to-portal">Back to Portal</button>
 
@@ -143,34 +129,27 @@
 
         // HTML containers
         const buttonContainer = document.getElementById('button-container');
-        const singleSheetContainer = document.getElementById('excel-container'); // This is the HOT container
-        const imageDisplaySingleSheet = document.getElementById('image-display-single-sheet'); // New image container
+        const singleSheetContainer = document.getElementById('excel-container');
         const allSheetsContainer = document.getElementById('all-sheets-container');
         const saveStatusDiv = document.getElementById('saveStatus');
 
-        let hot; // For the single sheet Handsontable instance
-        let allHotInstances = {}; // To store references to multiple Handsontable instances in "View All" mode
+        let hot; 
+        let allHotInstances = {};
 
-        // Define all known sheet names and their dimensions for Group F
+        // Define all known sheet names and their dimensions (Income statement (F).xlsx only)
         const ALL_SHEET_NAMES = [
-            'Income statement ( F).xlsx - Sheet1'
+            'Income statement ( F).xlsx - INCOME STATEMENT (2)',
+            'Income statement ( F).xlsx - INCOME STATEMENT'
         ];
 
         const SHEET_DIMENSIONS = {
-            // Placeholder dimensions. Adjust these if you have more precise values!
-            'Income statement ( F).xlsx - Sheet1': { rows: 30, cols: 6 } 
+            'Income statement ( F).xlsx - INCOME STATEMENT (2)': { rows: 20, cols: 5 },
+            'Income statement ( F).xlsx - INCOME STATEMENT': { rows: 20, cols: 5 }
         };
 
-        // Define images associated with specific sheets
-        const SHEET_IMAGES = {
-            'Income statement ( F).xlsx - Sheet1': '../Group F/Expense Tracker.png'
-        };
+        let currentViewMode = 'single';
+        let activeSheetName = ALL_SHEET_NAMES[0]; 
 
-
-        let currentViewMode = 'single'; // 'single' or 'all'
-        let activeSheetName = ALL_SHEET_NAMES[0]; // Default active sheet (first one in the list)
-
-        // Function to display status messages
         function showStatus(message, isError = false) {
             if (saveStatusDiv) {
                 saveStatusDiv.textContent = message;
@@ -178,107 +157,57 @@
                 setTimeout(() => {
                     saveStatusDiv.textContent = '';
                     saveStatusDiv.className = '';
-                }, 3000); // Clear message after 3 seconds
+                }, 3000);
             }
         }
 
-        // Function to send data to the backend
-        // Now takes 'sheet' as an explicit argument
         async function saveData(changes, sheet) {
-            console.log(`saveData received changes for sheet "${sheet}":`, changes);
-
-            if (!changes || changes.length === 0) {
-                return; // No changes to save
-            }
-
+            if (!changes || changes.length === 0) return;
             const transformedChanges = changes.map(([row, col, oldValue, newValue]) => ({
-                sheetName: sheet, // Use the sheet name explicitly passed to this function
-                row,
-                col,
-                cellValue: newValue
+                sheetName: sheet, row, col, cellValue: newValue
             }));
-
-            console.log("Transformed changes for saving:", transformedChanges);
-
             try {
                 showStatus('Saving data...');
                 const response = await fetch(`${BACKEND_URL}/api/updateExcel`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(transformedChanges)
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(transformedChanges)
                 });
-
                 if (!response.ok) {
                     const errorText = await response.text();
                     throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
-
                 const result = await response.json();
-                console.log('Frontend: Save successful:', result);
                 showStatus('Data saved successfully!', false);
             } catch (error) {
-                console.error('Frontend: Network error during save:', error);
                 showStatus(`Save failed: ${error.message}`, true);
             }
         }
 
-        // Initialize a single Handsontable instance for a given sheet
         function initializeSingleHandsontable(containerElement, sheetName, allSavedData) {
-            if (!containerElement) {
-                console.error(`Handsontable container element for "${sheetName}" not found!`);
-                return null;
-            }
-
-            const dimensions = SHEET_DIMENSIONS[sheetName] || { rows: 10, cols: 10 }; // Fallback to 10x10 if dimensions not found
-
-            // Create an empty spreadsheet data structure with specified dimensions
+            if (!containerElement) return null;
+            const dimensions = SHEET_DIMENSIONS[sheetName] || { rows: 10, cols: 10 };
             const defaultData = Handsontable.helper.createEmptySpreadsheetData(dimensions.rows, dimensions.cols);
-            
-            // Filter data for the specific sheet
-            const sheetSpecificData = allSavedData.filter(cell => 
-                cell.sheetName && cell.sheetName.trim() === sheetName.trim()
-            );
+            const sheetSpecificData = allSavedData.filter(cell => cell.sheetName && cell.sheetName.trim() === sheetName.trim());
 
             const newHot = new Handsontable(containerElement, {
-                data: defaultData, // Start with empty data, then populate from fetched data
-                rowHeaders: true,
-                colHeaders: true,
-                contextMenu: true,
-                manualColumnResize: true,
-                manualRowResize: true,
-                width: '100%',
-                height: 'auto',
-                stretchH: 'all',
-                licenseKey: 'non-commercial-and-evaluation', // Add this to suppress license warning
+                data: defaultData, rowHeaders: true, colHeaders: true, contextMenu: true,
+                manualColumnResize: true, manualRowResize: true, width: '100%', height: 'auto',
+                stretchH: 'all', licenseKey: 'non-commercial-and-evaluation',
                 afterChange: function(changes, source) {
-                    console.log(`afterChange triggered for sheet "${sheetName}". Source:`, source, "Raw Changes:", changes);
-
-                    if (source === 'loadData') {
-                        return; // Don't save changes that came from loading data
-                    }
-                    // Pass the specific sheetName to saveData
+                    if (source === 'loadData') return;
                     saveData(changes, sheetName); 
                 }
             });
-
-            // Populate the table with fetched data specific to this sheet
             if (sheetSpecificData.length > 0) {
                 sheetSpecificData.forEach(cell => {
-                    // Check if cell.row and cell.col are within the current dimensions before setting data
                     if (cell.row < dimensions.rows && cell.col < dimensions.cols) {
                         newHot.setDataAtCell(cell.row, cell.col, cell.cellValue, 'loadData');
-                    } else {
-                        console.warn(`Data for sheet "${sheetName}" at (${cell.row}, ${cell.col}) ignored as it's outside current dimensions.`);
                     }
                 });
             }
-            newHot.render(); // Ensure the table is rendered after data is set
+            newHot.render();
             return newHot;
         }
 
-        // Function to fetch ALL data from backend (used by both single and all views)
         async function fetchAllData() {
             showStatus('Loading data...');
             try {
@@ -288,191 +217,105 @@
                     throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
                 const data = await response.json();
-                console.log('Frontend: All data loaded successfully:', data);
                 showStatus('Data loaded successfully!', false);
                 return data;
             } catch (error) {
-                console.error('Frontend: Network error during data load:', error);
                 showStatus(`Failed to load data: ${error.message}`, true);
-                return []; // Return empty array on error
+                return [];
             }
         }
 
-        // --- View Management Functions ---
-
-        // Destroy all existing Handsontable instances
         function destroyAllHandsontableInstances() {
-            if (hot) { // Destroy single view instance if exists
-                hot.destroy();
-                hot = null;
-            }
-            for (const sheetName in allHotInstances) { // Destroy all "View All" instances
-                if (allHotInstances[sheetName]) {
-                    allHotInstances[sheetName].destroy();
-                }
-            }
-            allHotInstances = {}; // Clear the object
-            allSheetsContainer.innerHTML = ''; // Clear all dynamically added divs
+            if (hot) { hot.destroy(); hot = null; }
+            for (const sheetName in allHotInstances) { if (allHotInstances[sheetName]) allHotInstances[sheetName].destroy(); }
+            allHotInstances = {};
+            allSheetsContainer.innerHTML = '';
         }
 
-        // Render the single sheet view
         async function renderSingleSheetView() {
-            destroyAllHandsontableInstances(); // Clean up any other views
+            destroyAllHandsontableInstances();
             currentViewMode = 'single';
-            allSheetsContainer.style.display = 'none'; // Hide all sheets container
-
-            // Clear previous image and HOT content
-            imageDisplaySingleSheet.innerHTML = '';
-            singleSheetContainer.innerHTML = '';
-            singleSheetContainer.style.display = 'block'; // Show single container
-
-            // Display image if available for the active sheet
-            if (SHEET_IMAGES[activeSheetName]) {
-                const imgElement = document.createElement('img');
-                imgElement.src = SHEET_IMAGES[activeSheetName];
-                imgElement.alt = `${activeSheetName} Chart`;
-                imageDisplaySingleSheet.appendChild(imgElement);
-            }
-            
+            singleSheetContainer.style.display = 'block';
+            allSheetsContainer.style.display = 'none';
             const allSavedData = await fetchAllData();
             hot = initializeSingleHandsontable(singleSheetContainer, activeSheetName, allSavedData);
-            updateSheetButtons(); // Update active button styling
+            updateSheetButtons();
         }
 
-        // Render the multiple sheets view
         async function renderAllSheetsView() {
-            destroyAllHandsontableInstances(); // Clean up any other views
+            destroyAllHandsontableInstances();
             currentViewMode = 'all';
-            singleSheetContainer.style.display = 'none'; // Hide single container
-            imageDisplaySingleSheet.innerHTML = ''; // Clear single image area
-            allSheetsContainer.style.display = 'block'; // Show all sheets container
-            allSheetsContainer.innerHTML = ''; // Clear existing content
-
+            singleSheetContainer.style.display = 'none';
+            allSheetsContainer.style.display = 'block';
             const allSavedData = await fetchAllData();
 
             ALL_SHEET_NAMES.forEach(sheetName => {
-                // Create a div for each sheet's Handsontable
                 const sheetWrapper = document.createElement('div');
                 sheetWrapper.className = 'sheet-table-wrapper';
-                
                 const title = document.createElement('h2');
-                title.textContent = `Sheet: ${sheetName}`; // Keep full name for title
+                title.textContent = `Sheet: ${sheetName}`;
                 sheetWrapper.appendChild(title);
-
-                // Display image if available for this sheet in "View All" mode
-                if (SHEET_IMAGES[sheetName]) {
-                    const imgElement = document.createElement('img');
-                    imgElement.src = SHEET_IMAGES[sheetName];
-                    imgElement.alt = `${sheetName} Chart`;
-                    // Apply styles directly or via a class
-                    imgElement.style.maxWidth = '80%';
-                    imgElement.style.height = 'auto';
-                    imgElement.style.display = 'block';
-                    imgElement.style.margin = '0 auto 20px auto';
-                    imgElement.style.border = '1px solid #ccc';
-                    imgElement.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                    sheetWrapper.appendChild(imgElement);
-                }
-
                 const sheetContainer = document.createElement('div');
-                sheetContainer.id = `handsontable-container-${sheetName.replace(/[^a-zA-Z0-9-]/g, '_')}`; // Sanitize ID for safety
+                sheetContainer.id = `handsontable-container-${sheetName.replace(/[^a-zA-Z0-9-]/g, '_')}`;
                 sheetWrapper.appendChild(sheetContainer);
                 allSheetsContainer.appendChild(sheetWrapper);
-
-                // Initialize Handsontable for this specific sheet
                 const sheetHot = initializeSingleHandsontable(sheetContainer, sheetName, allSavedData);
-                if (sheetHot) {
-                    allHotInstances[sheetName] = sheetHot; // Store reference
-                }
+                if (sheetHot) allHotInstances[sheetName] = sheetHot;
             });
-            updateSheetButtons(); // Update active button styling
+            updateSheetButtons();
         }
 
-        // Function to update active button styling
         function updateSheetButtons() {
             document.querySelectorAll('#button-container button').forEach(button => {
                 if (button.id === 'view-all-button') {
-                    if (currentViewMode === 'all') {
-                        button.classList.add('active');
-                    } else {
-                        button.classList.remove('active');
-                    }
+                    if (currentViewMode === 'all') button.classList.add('active'); else button.classList.remove('active');
                 } else {
                     const sheet = button.getAttribute('data-sheet');
-                    if (currentViewMode === 'single' && sheet && sheet.trim() === activeSheetName.trim()) {
-                        button.classList.add('active');
-                    } else {
-                        button.classList.remove('active');
-                    }
+                    if (currentViewMode === 'single' && sheet && sheet.trim() === activeSheetName.trim()) button.classList.add('active'); else button.classList.remove('active');
                 }
             });
         }
 
-        // --- Initial Setup and Event Listeners ---
-
-        // Dynamically create sheet buttons
         function createSheetButtons() {
-            const filePrefixes = [ // List of all possible prefixes to remove from button text
-                'TEAM A.xlsx - ',
-                'TEAM B.xlsx - ',
-                'INVOICE ( TEAM C).xlsx - ',
-                'Income statement ( F).xlsx - ',
-                'Balnce sheet ( TEAM D ).xlsx - ',
-                'daily expense detail.xlsx - ',
-                'Debit credit.xlsx - '
-            ];
+            const filePrefixes = ['Income statement ( F).xlsx - ']; // Only prefix for Income statement (F).xlsx
 
             ALL_SHEET_NAMES.forEach(sheetName => {
                 const button = document.createElement('button');
-                button.setAttribute('data-sheet', sheetName); // Full unique name for internal use
-                
-                // Display text for the button (remove relevant prefix)
+                button.setAttribute('data-sheet', sheetName);
                 let buttonText = sheetName;
                 for (const prefix of filePrefixes) {
                     if (buttonText.startsWith(prefix)) {
                         buttonText = buttonText.substring(prefix.length);
-                        break; // Found and removed a prefix, no need to check others
+                        break;
                     }
                 }
                 button.textContent = buttonText;
-
                 buttonContainer.appendChild(button);
             });
-            // Add the 'View All Sheets' button last
             const viewAllButton = document.createElement('button');
             viewAllButton.id = 'view-all-button';
             viewAllButton.textContent = 'View All Sheets';
             buttonContainer.appendChild(viewAllButton);
         }
 
-        // Assign event listeners after buttons are created
         function assignButtonListeners() {
-            // Event listener for "Back to Portal" button
             document.getElementById('back-to-portal').addEventListener('click', () => {
-                // Adjust path based on HTML file location (e.g., group-f.html in Group F/ folder)
-                window.location.href = '../../index.html'; 
+                window.location.href = '../index.html';
             });
-
-            // Event listener for single sheet selection buttons
             document.querySelectorAll('#button-container button[data-sheet]').forEach(button => {
                 button.addEventListener('click', function() {
-                    activeSheetName = this.getAttribute('data-sheet'); // Update active sheet
-                    renderSingleSheetView(); // Render the single sheet view
+                    activeSheetName = this.getAttribute('data-sheet');
+                    renderSingleSheetView();
                 });
             });
-
-            // Event listener for "View All Sheets" button
             document.getElementById('view-all-button').addEventListener('click', () => {
-                renderAllSheetsView(); // Render the all sheets view
+                renderAllSheetsView();
             });
         }
 
-        // Initial setup when the DOM is fully loaded
         document.addEventListener('DOMContentLoaded', () => {
-            createSheetButtons(); // Create all buttons first
-            assignButtonListeners(); // Then assign their listeners
-
-            // Start with the default single sheet view (first sheet in the list)
+            createSheetButtons();
+            assignButtonListeners();
             renderSingleSheetView(); 
         });
 
