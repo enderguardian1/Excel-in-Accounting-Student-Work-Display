@@ -1,65 +1,18 @@
-# Navigate to your frontend project directory first
-# Example: cd path/to/your/frontend/project
-
-# 1. Create/Update group-d.html
-# Create the 'Group D' directory if it doesn't exist
-mkdir -p "Group D"
-# Use 'cat >' to create or overwrite the file with the content below
-cat > "Group D/group-d.html" << 'EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Group D Excel Data Viewer</title>
+    <title>Group F Excel Data Viewer</title>
     <base href="./">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.css">
     <link rel="stylesheet" href="../style.css">
     <style>
-        /* Minimal styling with button styles */
         body {
             font-family: Arial, sans-serif;
             padding: 20px;
             background-color: #D4D4D4;
         }
-        /* Container for the single sheet view */
-        #excel-container { 
-            margin-top: 20px;
-        }
-        /* Container for image display */
-        #image-display-container {
-            margin-top: 20px;
-            text-align: center;
-            max-width: 90%; /* Responsive width */
-            display: none; /* Hidden by default */
-        }
-        #image-display-container img {
-            max-width: 100%; /* Image fills its container */
-            height: auto;
-            border: 2px solid #555;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            display: block; /* Remove extra space below image */
-            margin: 0 auto; /* Center image if container is wider */
-        }
-        /* Container for all sheets view */
-        #all-sheets-container {
-            margin-top: 20px;
-            display: none; /* Hidden by default */
-        }
-        .sheet-table-wrapper {
-            margin-bottom: 30px;
-            padding: 15px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            background-color: #f9f9f9;
-        }
-        .sheet-table-wrapper h2 {
-            margin-top: 0;
-            font-size: 1.5em;
-            color: #333;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-        }
+        /* Container for buttons */
         #button-container {
             display: flex;
             flex-wrap: wrap;
@@ -67,6 +20,7 @@ cat > "Group D/group-d.html" << 'EOF'
             gap: 10px;
             margin-bottom: 20px;
         }
+        /* Styles for buttons */
         #button-container button {
             padding: 12px 18px;
             background-color: #444;
@@ -81,26 +35,45 @@ cat > "Group D/group-d.html" << 'EOF'
             background-color: #222;
         }
         #button-container button.active {
-            background-color: #4CAF50;
+            background-color: #4CAF50; /* Active button color */
             color: white;
         }
-        #view-all-button {
-            padding: 12px 18px;
-            background-color: #e0e0e0;
-            color: #333;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: background-color 0.3s ease;
+
+        /* Status message for data saving */
+        #saveStatus {
+            margin-top: 10px;
+            font-weight: bold;
         }
-        #view-all-button:hover {
-            background-color: #ccc;
+        #saveStatus.success {
+            color: green;
         }
-        #view-all-button.active { /* Style for active "View All" button */
-            background-color: #007BFF;
-            color: white;
+        #saveStatus.error {
+            color: red;
         }
+
+        /* Content area to switch between Handsontable and Image */
+        #content-area {
+            margin-top: 20px;
+        }
+        #excel-container {
+            display: block; /* Shown by default */
+            width: 100%;
+        }
+        #image-display-area {
+            display: none; /* Hidden by default */
+            text-align: center;
+            max-width: 90%;
+            margin: 20px auto; /* Center the image area */
+        }
+        #image-display-area img {
+            max-width: 100%;
+            height: auto;
+            border: 2px solid #555;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            display: block;
+            margin: 0 auto;
+        }
+        /* Back to portal button */
         #back-to-portal {
             margin-top: 20px;
             padding: 10px 20px;
@@ -112,34 +85,18 @@ cat > "Group D/group-d.html" << 'EOF'
             font-size: 16px;
             transition: background-color 0.3s ease;
         }
-
         #back-to-portal:hover {
             background-color: #0056b3;
-        }
-
-        /* Styling for the save status message */
-        #saveStatus {
-            margin-top: 10px;
-            font-weight: bold;
-        }
-        #saveStatus.success {
-            color: green;
-        }
-        #saveStatus.error {
-            color: red;
         }
     </style>
 </head>
 <body>
-    <div id="button-container">
-    </div>
+    <div id="button-container"></div>
+    <div id="saveStatus"></div>
 
-    <div id="saveStatus" style="margin-top: 10px; font-weight: bold;"></div> 
-
-    <div id="excel-container"></div> 
-    <div id="image-display-container"></div>
-
-    <div id="all-sheets-container">
+    <div id="content-area">
+        <div id="excel-container"></div>
+        <div id="image-display-area"></div>
     </div>
 
     <button id="back-to-portal">Back to Portal</button>
@@ -148,33 +105,32 @@ cat > "Group D/group-d.html" << 'EOF'
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <script>
-        // Backend URL - IMPORTANT: This must be your actual Render backend URL
         const BACKEND_URL = 'https://accounting-project-backend.onrender.com';
 
-        // HTML containers
         const buttonContainer = document.getElementById('button-container');
-        const singleSheetContainer = document.getElementById('excel-container');
-        const imageDisplayContainer = document.getElementById('image-display-container'); // New image container
-        const allSheetsContainer = document.getElementById('all-sheets-container');
+        const excelContainer = document.getElementById('excel-container');
+        const imageDisplayArea = document.getElementById('image-display-area');
         const saveStatusDiv = document.getElementById('saveStatus');
 
-        let hot; // For the single sheet Handsontable instance
-        let allHotInstances = {}; // To store references to multiple Handsontable instances in "View All" mode
+        let hot; // To hold the Handsontable instance
 
-        // Define all known sheet names and their dimensions (including image sheets)
-        const ALL_SHEET_NAMES = [
-            'Balnce sheet ( TEAM D ).xlsx - Sheet1', // Example data sheet for Group D
-            'Balnce sheet ( TEAM D ).xlsx - Pie Chart'
+        // Define all content identifiers for Group F
+        const ALL_CONTENT_IDENTIFIERS = [
+            'Income statement ( F).xlsx - Sheet1', // Identifier for the Handsontable sheet
+            'F_ExpenseTracker' // Special identifier for the image
         ];
 
+        // Dimensions for Handsontable sheets only
         const SHEET_DIMENSIONS = {
-            'Balnce sheet ( TEAM D ).xlsx - Sheet1': { type: 'handsontable', rows: 20, cols: 5 }, // Example dimensions
-            'Balnce sheet ( TEAM D ).xlsx - Pie Chart': { type: 'image', path: '/Group D/PieChart.png' }
+            'Income statement ( F).xlsx - Sheet1': { rows: 25, cols: 7 } // Example dimensions for F's sheet
         };
 
+        // Mapping for image identifiers to their file paths
+        const IMAGE_MAPPINGS = {
+            'F_ExpenseTracker': 'Expense Tracker.png' // Image file path, assuming it's in the same folder
+        };
 
-        let currentViewMode = 'single'; // 'single' or 'all'
-        let activeSheetName = ALL_SHEET_NAMES[0]; // Default active sheet (first one in the list)
+        let activeContentIdentifier = ALL_CONTENT_IDENTIFIERS[0]; // Default to first item (Handsontable sheet)
 
         // Function to display status messages
         function showStatus(message, isError = false) {
@@ -184,111 +140,35 @@ cat > "Group D/group-d.html" << 'EOF'
                 setTimeout(() => {
                     saveStatusDiv.textContent = '';
                     saveStatusDiv.className = '';
-                }, 3000); // Clear message after 3 seconds
+                }, 3000);
             }
         }
 
-        // Function to send data to the backend
-        // Now takes 'sheet' as an explicit argument
+        // Function to save data to the backend
         async function saveData(changes, sheet) {
-            console.log(`saveData received changes for sheet "${sheet}":`, changes);
-
-            if (!changes || changes.length === 0) {
-                return; // No changes to save
-            }
-
+            if (!changes || changes.length === 0) return;
             const transformedChanges = changes.map(([row, col, oldValue, newValue]) => ({
-                sheetName: sheet, // Use the sheet name explicitly passed to this function
-                row,
-                col,
-                cellValue: newValue
+                sheetName: sheet, row, col, cellValue: newValue
             }));
-
-            console.log("Transformed changes for saving:", transformedChanges);
-
             try {
                 showStatus('Saving data...');
                 const response = await fetch(`${BACKEND_URL}/api/updateExcel`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(transformedChanges)
                 });
-
                 if (!response.ok) {
                     const errorText = await response.text();
                     throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
-
-                const result = await response.json();
-                console.log('Frontend: Save successful:', result);
+                await response.json();
                 showStatus('Data saved successfully!', false);
             } catch (error) {
-                console.error('Frontend: Network error during save:', error);
                 showStatus(`Save failed: ${error.message}`, true);
             }
         }
 
-        // Initialize a single Handsontable instance for a given sheet
-        function initializeSingleHandsontable(containerElement, sheetName, allSavedData) {
-            if (!containerElement) {
-                console.error(`Handsontable container element for "${sheetName}" not found!`);
-                return null;
-            }
-
-            const dimensions = SHEET_DIMENSIONS[sheetName];
-            if (!dimensions || dimensions.type !== 'handsontable') {
-                console.warn(`Attempted to initialize Handsontable for non-handsontable sheet type: ${sheetName}`);
-                return null; // Do not initialize if it's not a handsontable type
-            }
-
-            // Create an empty spreadsheet data structure with specified dimensions
-            const defaultData = Handsontable.helper.createEmptySpreadsheetData(dimensions.rows, dimensions.cols);
-            
-            // Filter data for the specific sheet
-            const sheetSpecificData = allSavedData.filter(cell => 
-                cell.sheetName && cell.sheetName.trim() === sheetName.trim()
-            );
-
-            const newHot = new Handsontable(containerElement, {
-                data: defaultData, // Start with empty data, then populate from fetched data
-                rowHeaders: true,
-                colHeaders: true,
-                contextMenu: true,
-                manualColumnResize: true,
-                manualRowResize: true,
-                width: '100%',
-                height: 'auto',
-                stretchH: 'all',
-                licenseKey: 'non-commercial-and-evaluation', // Add this to suppress license warning
-                afterChange: function(changes, source) {
-                    console.log(`afterChange triggered for sheet "${sheetName}". Source:`, source, "Raw Changes:", changes);
-
-                    if (source === 'loadData') {
-                        return; // Don't save changes that came from loading data
-                    }
-                    // Pass the specific sheetName to saveData
-                    saveData(changes, sheetName); 
-                }
-            });
-
-            // Populate the table with fetched data specific to this sheet
-            if (sheetSpecificData.length > 0) {
-                sheetSpecificData.forEach(cell => {
-                    // Check if cell.row and cell.col are within the current dimensions before setting data
-                    if (cell.row < dimensions.rows && cell.col < dimensions.cols) {
-                        newHot.setDataAtCell(cell.row, cell.col, cell.cellValue, 'loadData');
-                    } else {
-                        console.warn(`Data for sheet "${sheetName}" at (${cell.row}, ${cell.col}) ignored as it's outside current dimensions.`);
-                    }
-                });
-            }
-            newHot.render(); // Ensure the table is rendered after data is set
-            return newHot;
-        }
-
-        // Function to fetch ALL data from backend (used by both single and all views)
+        // Function to fetch all data from backend
         async function fetchAllData() {
             showStatus('Loading data...');
             try {
@@ -298,180 +178,134 @@ cat > "Group D/group-d.html" << 'EOF'
                     throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
                 const data = await response.json();
-                console.log('Frontend: All data loaded successfully:', data);
                 showStatus('Data loaded successfully!', false);
                 return data;
             } catch (error) {
-                console.error('Frontend: Network error during data load:', error);
                 showStatus(`Failed to load data: ${error.message}`, true);
-                return []; // Return empty array on error
+                return [];
             }
         }
 
-        // --- View Management Functions ---
-
-        // Destroy all existing Handsontable instances
-        function destroyAllHandsontableInstances() {
-            if (hot) { // Destroy single view instance if exists
+        // Render either Handsontable or Image
+        async function renderContent(identifier) {
+            // Destroy existing Handsontable instance if it exists
+            if (hot) {
                 hot.destroy();
                 hot = null;
             }
-            for (const sheetName in allHotInstances) { // Destroy all "View All" instances
-                if (allHotInstances[sheetName]) {
-                    allHotInstances[sheetName].destroy();
-                }
-            }
-            allHotInstances = {}; // Clear the object
-            allSheetsContainer.innerHTML = ''; // Clear all dynamically added divs
-        }
 
-        // Render the single sheet view
-        async function renderSingleSheetView() {
-            destroyAllHandsontableInstances(); // Clean up any other views
-            currentViewMode = 'single';
+            // Hide both containers initially
+            excelContainer.style.display = 'none';
+            imageDisplayArea.style.display = 'none';
+            imageDisplayArea.innerHTML = ''; // Clear any previous image
 
-            const sheetConfig = SHEET_DIMENSIONS[activeSheetName];
-            if (sheetConfig && sheetConfig.type === 'image') {
-                // Display the image
-                singleSheetContainer.style.display = 'none'; // Hide Handsontable container
-                imageDisplayContainer.style.display = 'block'; // Show image container
-                imageDisplayContainer.innerHTML = `<img src="${sheetConfig.path}" alt="${activeSheetName}">`;
-            } else {
-                // Display Handsontable
-                singleSheetContainer.style.display = 'block'; // Show Handsontable container
-                imageDisplayContainer.style.display = 'none'; // Hide image container
-                imageDisplayContainer.innerHTML = ''; // Clear previous image
+            // Update the active content identifier
+            activeContentIdentifier = identifier;
 
+            // Check if the identifier maps to an image
+            if (IMAGE_MAPPINGS[identifier]) {
+                const imageSrc = IMAGE_MAPPINGS[identifier];
+                const imgElement = document.createElement('img');
+                imgElement.src = imageSrc;
+                imgElement.alt = identifier; // Use identifier as alt text
+                imageDisplayArea.appendChild(imgElement);
+                imageDisplayArea.style.display = 'block'; // Show image container
+            } else { // Assume it's a Handsontable sheet
+                excelContainer.style.display = 'block'; // Show Handsontable container
                 const allSavedData = await fetchAllData();
-                hot = initializeSingleHandsontable(singleSheetContainer, activeSheetName, allSavedData);
+                const dimensions = SHEET_DIMENSIONS[identifier] || { rows: 10, cols: 10 };
+                const defaultData = Handsontable.helper.createEmptySpreadsheetData(dimensions.rows, dimensions.cols);
+                
+                hot = new Handsontable(excelContainer, {
+                    data: defaultData,
+                    rowHeaders: true, colHeaders: true, contextMenu: true,
+                    manualColumnResize: true, manualRowResize: true,
+                    width: '100%', height: 'auto', stretchH: 'all',
+                    licenseKey: 'non-commercial-and-evaluation', // Suppress license warning
+                    afterChange: function(changes, source) {
+                        if (source === 'loadData') return;
+                        saveData(changes, identifier); 
+                    }
+                });
+
+                // Populate with fetched data
+                const sheetSpecificData = allSavedData.filter(cell => 
+                    cell.sheetName && cell.sheetName.trim() === identifier.trim()
+                );
+                if (sheetSpecificData.length > 0) {
+                    sheetSpecificData.forEach(cell => {
+                        if (cell.row < dimensions.rows && cell.col < dimensions.cols) {
+                            hot.setDataAtCell(cell.row, cell.col, cell.cellValue, 'loadData');
+                        }
+                    });
+                }
+                hot.render(); // Render after data is set
             }
-            updateSheetButtons(); // Update active button styling
+            updateButtonActiveStates(); // Update active button styling
         }
 
-        // Render the multiple sheets view
-        async function renderAllSheetsView() {
-            destroyAllHandsontableInstances(); // Clean up any other views
-            currentViewMode = 'all';
-            singleSheetContainer.style.display = 'none'; // Hide single container
-            imageDisplayContainer.style.display = 'none'; // Hide image container in all view
-            imageDisplayContainer.innerHTML = ''; // Clear previous image
-            allSheetsContainer.style.display = 'block'; // Show all sheets container
-
-            const allSavedData = await fetchAllData();
-
-            ALL_SHEET_NAMES.forEach(sheetName => {
-                const sheetConfig = SHEET_DIMENSIONS[sheetName];
-                // Only create Handsontable for sheets explicitly marked as 'handsontable'
-                if (sheetConfig && sheetConfig.type === 'handsontable') {
-                    const sheetWrapper = document.createElement('div');
-                    sheetWrapper.className = 'sheet-table-wrapper';
-                    
-                    const title = document.createElement('h2');
-                    title.textContent = `Sheet: ${sheetName}`; // Keep full name for title
-                    sheetWrapper.appendChild(title);
-
-                    const sheetContainer = document.createElement('div');
-                    sheetContainer.id = `handsontable-container-${sheetName.replace(/[^a-zA-Z0-9-]/g, '_')}`; // Sanitize ID for safety
-                    sheetWrapper.appendChild(sheetContainer);
-                    allSheetsContainer.appendChild(sheetWrapper);
-
-                    // Initialize Handsontable for this specific sheet
-                    const sheetHot = initializeSingleHandsontable(sheetContainer, sheetName, allSavedData);
-                    if (sheetHot) {
-                        allHotInstances[sheetName] = sheetHot; // Store reference
-                    }
-                }
-            });
-            updateSheetButtons(); // Update active button styling
-        }
-
-        // Function to update active button styling
-        function updateSheetButtons() {
+        // Update button active states
+        function updateButtonActiveStates() {
             document.querySelectorAll('#button-container button').forEach(button => {
-                if (button.id === 'view-all-button') {
-                    if (currentViewMode === 'all') {
-                        button.classList.add('active');
-                    } else {
-                        button.classList.remove('active');
-                    }
+                const sheet = button.getAttribute('data-sheet');
+                if (sheet && sheet.trim() === activeContentIdentifier.trim()) {
+                    button.classList.add('active');
                 } else {
-                    const sheet = button.getAttribute('data-sheet');
-                    if (currentViewMode === 'single' && sheet && sheet.trim() === activeSheetName.trim()) {
-                        button.classList.add('active');
-                    } else {
-                        button.classList.remove('active');
-                    }
+                    button.classList.remove('active');
                 }
             });
         }
 
-        // --- Initial Setup and Event Listeners ---
-
-        // Dynamically create sheet buttons
-        function createSheetButtons() {
-            const filePrefixes = [ // List of all possible prefixes to remove from button text
-                'TEAM A.xlsx - ',
-                'TEAM B.xlsx - ',
-                'INVOICE ( TEAM C).xlsx - ',
-                'Income statement ( F).xlsx - ', // Added for Group F
-                'Balnce sheet ( TEAM D ).xlsx - ',
-                'daily expense detail.xlsx - ',
-                'Debit credit.xlsx - '
+        // Dynamically create buttons for all content
+        function createButtons() {
+            const filePrefixes = [
+                'TEAM A.xlsx - ', 'TEAM B.xlsx - ', 'INVOICE ( TEAM C).xlsx - ',
+                'Balnce sheet ( TEAM D ).xlsx - ', 'daily expense detail.xlsx - ',
+                'Income statement ( F).xlsx - ', 'Debit credit.xlsx - '
             ];
 
-            ALL_SHEET_NAMES.forEach(sheetName => {
+            ALL_CONTENT_IDENTIFIERS.forEach(identifier => {
                 const button = document.createElement('button');
-                button.setAttribute('data-sheet', sheetName); // Full unique name for internal use
+                button.setAttribute('data-sheet', identifier);
                 
-                // Display text for the button (remove relevant prefix)
-                let buttonText = sheetName;
+                let buttonText = identifier;
+                // Clean up Excel sheet names for display
                 for (const prefix of filePrefixes) {
                     if (buttonText.startsWith(prefix)) {
                         buttonText = buttonText.substring(prefix.length);
-                        break; // Found and removed a prefix, no need to check others
+                        break;
                     }
                 }
+                // Custom text for image buttons
+                if (identifier === 'F_ExpenseTracker') {
+                    buttonText = 'Expense Tracker';
+                }
                 button.textContent = buttonText;
-
                 buttonContainer.appendChild(button);
             });
-            // Add the 'View All Sheets' button last
-            const viewAllButton = document.createElement('button');
-            viewAllButton.id = 'view-all-button';
-            viewAllButton.textContent = 'View All Sheets';
-            buttonContainer.appendChild(viewAllButton);
         }
 
-        // Assign event listeners after buttons are created
+        // Assign event listeners to buttons
         function assignButtonListeners() {
-            // Event listener for "Back to Portal" button
+            // "Back to Portal" button
             document.getElementById('back-to-portal').addEventListener('click', () => {
-                window.location.href = '../../index.html'; // Adjust path if needed
+                window.location.href = '../../index.html'; // Adjust path for consistency
             });
 
-            // Event listener for single sheet selection buttons
+            // Content selection buttons
             document.querySelectorAll('#button-container button[data-sheet]').forEach(button => {
                 button.addEventListener('click', function() {
-                    activeSheetName = this.getAttribute('data-sheet'); // Update active sheet
-                    renderSingleSheetView(); // Render the single sheet view
+                    renderContent(this.getAttribute('data-sheet'));
                 });
-            });
-
-            // Event listener for "View All Sheets" button
-            document.getElementById('view-all-button').addEventListener('click', () => {
-                renderAllSheetsView(); // Render the all sheets view
             });
         }
 
-        // Initial setup when the DOM is fully loaded
+        // Initial setup on page load
         document.addEventListener('DOMContentLoaded', () => {
-            createSheetButtons(); // Create all buttons first
-            assignButtonListeners(); // Then assign their listeners
-
-            // Start with the default single sheet view (first sheet in the list)
-            renderSingleSheetView(); 
+            createButtons();
+            assignButtonListeners();
+            renderContent(activeContentIdentifier); // Render the default content
         });
-
     </script>
 </body>
 </html>
