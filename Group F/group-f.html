@@ -1,8 +1,16 @@
+# Navigate to your frontend project directory first
+# Example: cd path/to/your/frontend/project
+
+# 1. Create/Update group-d.html
+# Create the 'Group D' directory if it doesn't exist
+mkdir -p "Group D"
+# Use 'cat >' to create or overwrite the file with the content below
+cat > "Group D/group-d.html" << 'EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Group F Excel Data Viewer & Chart</title>
+    <title>Group D Excel Data Viewer</title>
     <base href="./">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/handsontable@latest/dist/handsontable.full.min.css">
     <link rel="stylesheet" href="../style.css">
@@ -12,34 +20,30 @@
             font-family: Arial, sans-serif;
             padding: 20px;
             background-color: #D4D4D4;
-            display: flex;
-            flex-direction: column;
-            align-items: center; /* Center content horizontally */
         }
-        /* New container for side-by-side layout */
-        #main-content-wrapper {
-            display: flex; /* Use flexbox for side-by-side layout */
-            gap: 20px; /* Space between table and image */
-            margin-top: 20px;
-            flex-wrap: wrap; /* Allow wrapping on smaller screens */
-            justify-content: center; /* Center content horizontally */
-            align-items: flex-start; /* Align items to the top */
-            width: 100%; /* Take full width */
-            max-width: 1200px; /* Limit overall width for readability */
-        }
-
-        /* Container for the single sheet view (Handsontable) */
+        /* Container for the single sheet view */
         #excel-container { 
-            flex: 1; /* Allow Handsontable to take up available space */
-            min-width: 400px; /* Minimum width before wrapping */
-            max-width: 100%; /* Prevent it from overflowing its container */
-            margin-top: 0; /* Reset margin as it's part of flex container */
+            margin-top: 20px;
+        }
+        /* Container for image display */
+        #image-display-container {
+            margin-top: 20px;
+            text-align: center;
+            max-width: 90%; /* Responsive width */
+            display: none; /* Hidden by default */
+        }
+        #image-display-container img {
+            max-width: 100%; /* Image fills its container */
+            height: auto;
+            border: 2px solid #555;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            display: block; /* Remove extra space below image */
+            margin: 0 auto; /* Center image if container is wider */
         }
         /* Container for all sheets view */
         #all-sheets-container {
             margin-top: 20px;
             display: none; /* Hidden by default */
-            flex-basis: 100%; /* Take full width when showing all sheets */
         }
         .sheet-table-wrapper {
             margin-bottom: 30px;
@@ -124,48 +128,6 @@
         #saveStatus.error {
             color: red;
         }
-
-        /* Image container specific styles */
-        #chart-image-container {
-            flex: 0 0 350px; /* Don't grow, don't shrink, fixed width if space allows */
-            max-width: 45%; /* Limit image width to less than half of available space */
-            text-align: center;
-            padding: 15px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            background-color: #f9f9f9;
-            display: none; /* Hidden by default, shown by JS when relevant */
-        }
-        #chart-image-container img {
-            max-width: 100%; /* Image fits within its container */
-            height: auto;
-            border: 2px solid #333; /* Slightly darker border for the image */
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3); /* More pronounced shadow */
-        }
-        #chart-image-container h2 {
-            margin-top: 0;
-            font-size: 1.2em;
-            color: #333;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-        }
-
-        /* Responsive adjustments for smaller screens */
-        @media (max-width: 768px) {
-            #main-content-wrapper {
-                flex-direction: column; /* Stack vertically on small screens */
-                align-items: center;
-            }
-            #excel-container, #chart-image-container {
-                flex-basis: auto; /* Allow items to size naturally */
-                max-width: 100%; /* Take full width */
-                min-width: unset; /* Remove min-width constraint */
-            }
-            #chart-image-container {
-                 margin-top: 20px; /* Add space between stacked items */
-            }
-        }
     </style>
 </head>
 <body>
@@ -174,12 +136,8 @@
 
     <div id="saveStatus" style="margin-top: 10px; font-weight: bold;"></div> 
 
-    <div id="main-content-wrapper">
-        <div id="excel-container"></div> 
-        <div id="chart-image-container">
-            <h2>Related Chart</h2>
-            </div>
-    </div>
+    <div id="excel-container"></div> 
+    <div id="image-display-container"></div>
 
     <div id="all-sheets-container">
     </div>
@@ -196,25 +154,22 @@
         // HTML containers
         const buttonContainer = document.getElementById('button-container');
         const singleSheetContainer = document.getElementById('excel-container');
+        const imageDisplayContainer = document.getElementById('image-display-container'); // New image container
         const allSheetsContainer = document.getElementById('all-sheets-container');
         const saveStatusDiv = document.getElementById('saveStatus');
-        const chartImageContainer = document.getElementById('chart-image-container'); // New image container
 
         let hot; // For the single sheet Handsontable instance
         let allHotInstances = {}; // To store references to multiple Handsontable instances in "View All" mode
 
-        // Define all known sheet names and their dimensions for Group F
+        // Define all known sheet names and their dimensions (including image sheets)
         const ALL_SHEET_NAMES = [
-            'Income statement ( F).xlsx - Sheet1'
+            'Balnce sheet ( TEAM D ).xlsx - Sheet1', // Example data sheet for Group D
+            'Balnce sheet ( TEAM D ).xlsx - Pie Chart'
         ];
 
         const SHEET_DIMENSIONS = {
-            'Income statement ( F).xlsx - Sheet1': { rows: 25, cols: 8 } // Default dimensions for F
-        };
-
-        // Mapping for sheets to their respective chart images
-        const SHEET_CHART_IMAGES = {
-            'Income statement ( F).xlsx - Sheet1': '../Group F/Expense Tracker.png'
+            'Balnce sheet ( TEAM D ).xlsx - Sheet1': { type: 'handsontable', rows: 20, cols: 5 }, // Example dimensions
+            'Balnce sheet ( TEAM D ).xlsx - Pie Chart': { type: 'image', path: '../Group D/PieChart.png' }
         };
 
 
@@ -282,7 +237,11 @@
                 return null;
             }
 
-            const dimensions = SHEET_DIMENSIONS[sheetName] || { rows: 10, cols: 10 }; // Fallback to 10x10 if dimensions not found
+            const dimensions = SHEET_DIMENSIONS[sheetName];
+            if (!dimensions || dimensions.type !== 'handsontable') {
+                console.warn(`Attempted to initialize Handsontable for non-handsontable sheet type: ${sheetName}`);
+                return null; // Do not initialize if it's not a handsontable type
+            }
 
             // Create an empty spreadsheet data structure with specified dimensions
             const defaultData = Handsontable.helper.createEmptySpreadsheetData(dimensions.rows, dimensions.cols);
@@ -370,22 +329,23 @@
         async function renderSingleSheetView() {
             destroyAllHandsontableInstances(); // Clean up any other views
             currentViewMode = 'single';
-            singleSheetContainer.style.display = 'block'; // Show single container
-            allSheetsContainer.style.display = 'none'; // Hide all sheets container
 
-            const allSavedData = await fetchAllData();
-            hot = initializeSingleHandsontable(singleSheetContainer, activeSheetName, allSavedData);
-            updateSheetButtons(); // Update active button styling
-
-            // Display relevant chart image
-            const chartImageSrc = SHEET_CHART_IMAGES[activeSheetName];
-            if (chartImageSrc) {
-                chartImageContainer.innerHTML = `<h2>Related Chart</h2><img src="${chartImageSrc}" alt="${activeSheetName} Chart">`;
-                chartImageContainer.style.display = 'block';
+            const sheetConfig = SHEET_DIMENSIONS[activeSheetName];
+            if (sheetConfig && sheetConfig.type === 'image') {
+                // Display the image
+                singleSheetContainer.style.display = 'none'; // Hide Handsontable container
+                imageDisplayContainer.style.display = 'block'; // Show image container
+                imageDisplayContainer.innerHTML = `<img src="${sheetConfig.path}" alt="${activeSheetName}">`;
             } else {
-                chartImageContainer.innerHTML = '';
-                chartImageContainer.style.display = 'none';
+                // Display Handsontable
+                singleSheetContainer.style.display = 'block'; // Show Handsontable container
+                imageDisplayContainer.style.display = 'none'; // Hide image container
+                imageDisplayContainer.innerHTML = ''; // Clear previous image
+
+                const allSavedData = await fetchAllData();
+                hot = initializeSingleHandsontable(singleSheetContainer, activeSheetName, allSavedData);
             }
+            updateSheetButtons(); // Update active button styling
         }
 
         // Render the multiple sheets view
@@ -393,30 +353,33 @@
             destroyAllHandsontableInstances(); // Clean up any other views
             currentViewMode = 'all';
             singleSheetContainer.style.display = 'none'; // Hide single container
+            imageDisplayContainer.style.display = 'none'; // Hide image container in all view
+            imageDisplayContainer.innerHTML = ''; // Clear previous image
             allSheetsContainer.style.display = 'block'; // Show all sheets container
-            chartImageContainer.innerHTML = ''; // Hide image when viewing all sheets
-            chartImageContainer.style.display = 'none';
 
             const allSavedData = await fetchAllData();
 
             ALL_SHEET_NAMES.forEach(sheetName => {
-                // Create a div for each sheet's Handsontable
-                const sheetWrapper = document.createElement('div');
-                sheetWrapper.className = 'sheet-table-wrapper';
-                
-                const title = document.createElement('h2');
-                title.textContent = `Sheet: ${sheetName}`; // Keep full name for title
-                sheetWrapper.appendChild(title);
+                const sheetConfig = SHEET_DIMENSIONS[sheetName];
+                // Only create Handsontable for sheets explicitly marked as 'handsontable'
+                if (sheetConfig && sheetConfig.type === 'handsontable') {
+                    const sheetWrapper = document.createElement('div');
+                    sheetWrapper.className = 'sheet-table-wrapper';
+                    
+                    const title = document.createElement('h2');
+                    title.textContent = `Sheet: ${sheetName}`; // Keep full name for title
+                    sheetWrapper.appendChild(title);
 
-                const sheetContainer = document.createElement('div');
-                sheetContainer.id = `handsontable-container-${sheetName.replace(/[^a-zA-Z0-9-]/g, '_')}`; // Sanitize ID for safety
-                sheetWrapper.appendChild(sheetContainer);
-                allSheetsContainer.appendChild(sheetWrapper);
+                    const sheetContainer = document.createElement('div');
+                    sheetContainer.id = `handsontable-container-${sheetName.replace(/[^a-zA-Z0-9-]/g, '_')}`; // Sanitize ID for safety
+                    sheetWrapper.appendChild(sheetContainer);
+                    allSheetsContainer.appendChild(sheetWrapper);
 
-                // Initialize Handsontable for this specific sheet
-                const sheetHot = initializeSingleHandsontable(sheetContainer, sheetName, allSavedData);
-                if (sheetHot) {
-                    allHotInstances[sheetName] = sheetHot; // Store reference
+                    // Initialize Handsontable for this specific sheet
+                    const sheetHot = initializeSingleHandsontable(sheetContainer, sheetName, allSavedData);
+                    if (sheetHot) {
+                        allHotInstances[sheetName] = sheetHot; // Store reference
+                    }
                 }
             });
             updateSheetButtons(); // Update active button styling
@@ -451,9 +414,9 @@
                 'TEAM B.xlsx - ',
                 'INVOICE ( TEAM C).xlsx - ',
                 'Income statement ( F).xlsx - ', // Added for Group F
-                'Balnce sheet ( TEAM D ).xlsx - ', // For Group D
-                'daily expense detail.xlsx - ', // For Group E
-                'Debit credit.xlsx - ' // For Group G
+                'Balnce sheet ( TEAM D ).xlsx - ',
+                'daily expense detail.xlsx - ',
+                'Debit credit.xlsx - '
             ];
 
             ALL_SHEET_NAMES.forEach(sheetName => {
@@ -466,7 +429,7 @@
                     if (buttonText.startsWith(prefix)) {
                         buttonText = buttonText.substring(prefix.length);
                         break; // Found and removed a prefix, no need to check others
-                    C}
+                    }
                 }
                 button.textContent = buttonText;
 
@@ -483,7 +446,7 @@
         function assignButtonListeners() {
             // Event listener for "Back to Portal" button
             document.getElementById('back-to-portal').addEventListener('click', () => {
-                window.location.href = '../../index.html'; // Adjusted path for nested group folders
+                window.location.href = '../../index.html'; // Adjust path if needed
             });
 
             // Event listener for single sheet selection buttons
